@@ -4379,6 +4379,17 @@ async function createWasm() {
           ctx.clearRect(0, 0, canvas.width, canvas.height);
       }
 
+  function _js_close_midi_input(index) {
+          if (!window.midiInputs || index < 0 || index >= window.midiInputs.length) {
+              return -1;
+          }
+  
+          var input = window.midiInputs[index];
+          input.onmidimessage = null;
+          console.log('Closed MIDI input: ' + input.name);
+          return 0;
+      }
+
   function _js_draw_ellipse(x, y, radiusX, radiusY) {
           var canvas = document.getElementById('keykit-canvas');
           if (!canvas) return;
@@ -4511,6 +4522,40 @@ async function createWasm() {
 
   function _js_has_key() {
           return (window.keykitKeyBuffer && window.keykitKeyBuffer.length > 0) ? 1 : 0;
+      }
+
+  function _js_open_midi_input(index) {
+          if (!window.midiInputs || index < 0 || index >= window.midiInputs.length) {
+              console.error('Invalid MIDI input index: ' + index);
+              return -1;
+          }
+  
+          var input = window.midiInputs[index];
+          console.log('Opening MIDI input: ' + input.name);
+  
+          // Set up message handler
+          input.onmidimessage = function(event) {
+              var data = event.data;
+              var status = data[0];
+              var data1 = data.length > 1 ? data[1] : 0;
+              var data2 = data.length > 2 ? data[2] : 0;
+  
+              // Call back into C code with MIDI data
+              if (typeof Module !== 'undefined' && Module.ccall) {
+                  Module.ccall('mdep_on_midi_message', null,
+                               ['number', 'number', 'number', 'number'],
+                               [index, status, data1, data2]);
+              }
+          };
+  
+          return 0; // Success
+      }
+
+  function _js_request_midi_access() {
+          // MIDI is already initialized in preRun (in keykit_shell.html)
+          // The devices are already in window.midiInputs and window.midiOutputs
+          // This function is just a no-op now
+          console.log('js_request_midi_access called (MIDI already initialized in preRun)');
       }
 
   function _js_send_midi_output(index, data_ptr, data_len) {
@@ -5587,7 +5632,6 @@ var _main = Module['_main'] = makeInvalidEarlyAccess('_main');
 var _malloc = makeInvalidEarlyAccess('_malloc');
 var _free = makeInvalidEarlyAccess('_free');
 var _mdep_on_midi_message = Module['_mdep_on_midi_message'] = makeInvalidEarlyAccess('_mdep_on_midi_message');
-var _mdep_on_midi_ready = Module['_mdep_on_midi_ready'] = makeInvalidEarlyAccess('_mdep_on_midi_ready');
 var _mdep_on_mouse_move = Module['_mdep_on_mouse_move'] = makeInvalidEarlyAccess('_mdep_on_mouse_move');
 var _mdep_on_mouse_button = Module['_mdep_on_mouse_button'] = makeInvalidEarlyAccess('_mdep_on_mouse_button');
 var _mdep_on_key_event = Module['_mdep_on_key_event'] = makeInvalidEarlyAccess('_mdep_on_key_event');
@@ -5623,7 +5667,6 @@ function assignWasmExports(wasmExports) {
   assert(typeof wasmExports['malloc'] != 'undefined', 'missing Wasm export: malloc');
   assert(typeof wasmExports['free'] != 'undefined', 'missing Wasm export: free');
   assert(typeof wasmExports['mdep_on_midi_message'] != 'undefined', 'missing Wasm export: mdep_on_midi_message');
-  assert(typeof wasmExports['mdep_on_midi_ready'] != 'undefined', 'missing Wasm export: mdep_on_midi_ready');
   assert(typeof wasmExports['mdep_on_mouse_move'] != 'undefined', 'missing Wasm export: mdep_on_mouse_move');
   assert(typeof wasmExports['mdep_on_mouse_button'] != 'undefined', 'missing Wasm export: mdep_on_mouse_button');
   assert(typeof wasmExports['mdep_on_key_event'] != 'undefined', 'missing Wasm export: mdep_on_key_event');
@@ -5656,7 +5699,6 @@ function assignWasmExports(wasmExports) {
   _malloc = createExportWrapper('malloc', 1);
   _free = createExportWrapper('free', 1);
   _mdep_on_midi_message = Module['_mdep_on_midi_message'] = createExportWrapper('mdep_on_midi_message', 4);
-  _mdep_on_midi_ready = Module['_mdep_on_midi_ready'] = createExportWrapper('mdep_on_midi_ready', 0);
   _mdep_on_mouse_move = Module['_mdep_on_mouse_move'] = createExportWrapper('mdep_on_mouse_move', 2);
   _mdep_on_mouse_button = Module['_mdep_on_mouse_button'] = createExportWrapper('mdep_on_mouse_button', 4);
   _mdep_on_key_event = Module['_mdep_on_key_event'] = createExportWrapper('mdep_on_key_event', 2);
@@ -5739,6 +5781,8 @@ var wasmImports = {
   /** @export */
   js_clear_canvas: _js_clear_canvas,
   /** @export */
+  js_close_midi_input: _js_close_midi_input,
+  /** @export */
   js_draw_ellipse: _js_draw_ellipse,
   /** @export */
   js_draw_line: _js_draw_line,
@@ -5770,6 +5814,10 @@ var wasmImports = {
   js_get_mouse_state: _js_get_mouse_state,
   /** @export */
   js_has_key: _js_has_key,
+  /** @export */
+  js_open_midi_input: _js_open_midi_input,
+  /** @export */
+  js_request_midi_access: _js_request_midi_access,
   /** @export */
   js_send_midi_output: _js_send_midi_output,
   /** @export */

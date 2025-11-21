@@ -201,9 +201,9 @@ void bi_fifoctl(int argc)
 ;
 void bi_mdep(int argc)
 ;
-void chkinputport(int portno)
+int validinputport(int portno)
 ;
-void chkoutputport(int portno)
+int validoutputport(int portno)
 ;
 void bi_midi(int argc)
 ;

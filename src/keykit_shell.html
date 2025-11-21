@@ -187,6 +187,53 @@
     </div>
 
     <script type="text/javascript">
+        // Function to initialize MIDI before main()
+        function initMIDI() {
+            console.log('Initializing MIDI access...');
+
+            // Tell Emscripten to wait for MIDI initialization
+            Module.addRunDependency('midi_init');
+
+            if (navigator.requestMIDIAccess) {
+                navigator.requestMIDIAccess({ sysex: false })
+                    .then(function(access) {
+                        console.log('MIDI access granted!');
+                        window.midiAccess = access;
+
+                        // Store inputs and outputs as arrays
+                        window.midiInputs = Array.from(access.inputs.values());
+                        window.midiOutputs = Array.from(access.outputs.values());
+
+                        console.log('Found ' + window.midiInputs.length + ' MIDI inputs');
+                        console.log('Found ' + window.midiOutputs.length + ' MIDI outputs');
+
+                        // Log device names
+                        window.midiInputs.forEach(function(input, index) {
+                            console.log('  Input ' + index + ': ' + input.name);
+                        });
+                        window.midiOutputs.forEach(function(output, index) {
+                            console.log('  Output ' + index + ': ' + output.name);
+                        });
+
+                        // Allow main() to proceed now that MIDI is ready
+                        Module.removeRunDependency('midi_init');
+                    })
+                    .catch(function(err) {
+                        console.error('MIDI access denied or error:', err);
+                        window.midiInputs = [];
+                        window.midiOutputs = [];
+                        // Remove dependency even on error so main() can proceed
+                        Module.removeRunDependency('midi_init');
+                    });
+            } else {
+                console.warn('Web MIDI API not supported in this browser');
+                window.midiInputs = [];
+                window.midiOutputs = [];
+                // Remove dependency so main() can proceed without MIDI
+                Module.removeRunDependency('midi_init');
+            }
+        }
+
         // Function to load KeyKit library files into virtual filesystem
         // Uses addRunDependency to block main() until files are loaded
         function loadLibraryFiles() {
@@ -258,7 +305,7 @@
 
         // Configuration for Emscripten Module
         var Module = {
-            preRun: [loadLibraryFiles],
+            preRun: [initMIDI, loadLibraryFiles],
             postRun: [],
             print: (function() {
                 var element = document.getElementById('output');
@@ -352,6 +399,18 @@
         // Request MIDI permissions on page load (optional)
         window.addEventListener('load', function() {
             console.log('KeyKit WebAssembly shell loaded successfully');
+        });
+
+        // Helper function to print stack trace from console
+        window.printStackTrace = function() {
+            console.log('Current Stack Trace:');
+            console.trace();
+        };
+
+        // Automatically print stack trace on errors
+        window.addEventListener('error', function(e) {
+            console.error('JavaScript Error:', e.message);
+            console.error('Stack:', e.error?.stack || new Error().stack);
         });
     </script>
 

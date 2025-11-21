@@ -1583,6 +1583,7 @@ void
 bi_exit(int argc)
 {
 	int r = 0;
+
 	if ( argc > 0 )
 		r = neednum("exit",ARG(0));
 	realexit(r);
@@ -2090,22 +2091,28 @@ bi_mdep(int argc)
 	ret(d);
 }
 
-void
-chkinputport(int portno)
+int
+validinputport(int portno)
 {
 	int p;
 	/* portno is keykit-valued input port number */
 	p = portno - MIDI_IN_PORT_OFFSET;
-	if ( p < 1 || p > MIDI_IN_DEVICES || Midiinputs[p-1].name == NULL )
-		execerror("midi: No input device # %d !?\n",portno);
+	if ( p < 1 || p > MIDI_IN_DEVICES || Midiinputs[p-1].name == NULL ) {
+		eprint("midi: No input device # %d !?\n",portno);
+		return 0;
+	}
+	return 1;
 }
 
-void
-chkoutputport(int portno)
+int
+validoutputport(int portno)
 {
 	/* portno is keykit-valued input port number */
-	if ( portno < 1 || portno >= MIDI_OUT_DEVICES || Midioutputs[portno-1].name == NULL )
-		execerror("midi: No output device # %d !?\n",portno);
+	if ( portno < 1 || portno >= MIDI_OUT_DEVICES || Midioutputs[portno-1].name == NULL ) {
+		eprint("midi: No output device # %d !?\n",portno);
+		return 0;
+	}
+	return 1;
 }
 
 void
@@ -2158,13 +2165,21 @@ bi_midi(int argc)
 		else if ( strcmp(arg1,"close")==0 ) {
 			if ( argc > 2 )
 				portno = neednum("midi",ARG(2));
-			else
-				execerror("usage: midi(input,close,#)\n");
-			chkinputport(portno);
+			else {
+				eprint("usage: midi(input,close,#)\n");
+				goto getout;
+			}
+
+			if ( ! validinputport(portno) ) {
+				eprint("midi: invalid input port number %d !?\n",portno);
+				goto getout;
+			}
 			/* Convert input portno to offset in Midiinputs */
 			p = portno - MIDI_IN_PORT_OFFSET;
-			if ( Midiinputs[p-1].opened == 0 )
-				execerror("midi: input port %d is not open !?\n",portno);
+			if ( Midiinputs[p-1].opened == 0 ) {
+				eprint("midi: input port %d is not open !?\n",portno);
+				goto getout;
+			}
 			r = mdep_midi(MIDI_CLOSE_INPUT,&Midiinputs[p-1]);
 			if ( r == 0 )
 				Midiinputs[p-1].opened = 0;
@@ -2173,13 +2188,20 @@ bi_midi(int argc)
 		else if ( strcmp(arg1,"open")==0 ) {
 			if ( argc > 2 )
 				portno = neednum("midi",ARG(2));
-			else
-				execerror("usage: midi(input,open,#)\n");
-			chkinputport(portno);
+			else {
+				eprint("usage: midi(input,open,#)\n");
+				goto getout;
+			}
+			if ( ! validinputport(portno) ) {
+				eprint("midi: invalid input port number %d !?\n",portno);
+				goto getout;
+			}
 			/* Convert input portno to offset in Midiinputs */
 			p = portno - MIDI_IN_PORT_OFFSET;
-			if ( Midiinputs[p-1].opened == 1 )
-				execerror("midi: input port %d is already open !?\n",portno);
+			if ( Midiinputs[p-1].opened == 1 ) {
+				eprint("midi: input port %d is already open !?\n",portno);
+				goto getout;
+			}
 			r = mdep_midi(MIDI_OPEN_INPUT,&Midiinputs[p-1]);
 			if ( r == 0 )
 				Midiinputs[p-1].opened = 1;
@@ -2188,15 +2210,21 @@ bi_midi(int argc)
 		else if ( strcmp(arg1,"isopen")==0 ) {
 			if ( argc > 2 )
 				portno = neednum("midi",ARG(2));
-			else
-				execerror("usage: midi(input,isopen,#)\n");
-			chkinputport(portno);
+			else {
+				eprint("usage: midi(input,isopen,#)\n");
+				goto getout;
+			}
+			if ( ! validinputport(portno) ) {
+				eprint("midi: invalid input port number %d !?\n",portno);
+				goto getout;
+			}
 			/* Convert input portno to offset in Midiinputs */
 			p = portno - MIDI_IN_PORT_OFFSET;
 			r = Midiinputs[p-1].opened;
 			d = numdatum(r);
 		} else {
-			execerror("usage: midi(input,list/open/close/isopen,#)\n");
+			eprint("usage: midi(input,list/open/close/isopen,#)\n");
+			goto getout;
 		}
 	}
 	else if ( strcmp(arg0,"output")==0 ) {
@@ -2219,11 +2247,21 @@ bi_midi(int argc)
 		else if ( strcmp(arg1,"close")==0 ) {
 			if ( argc > 2 )
 				portno = neednum("midi",ARG(2));
-			else
-				execerror("usage: midi(output,close,#)\n");
-			chkoutputport(portno);
-			if ( Midioutputs[portno-1].opened == 0 )
-				execerror("midi: output port %d is not open !?\n",portno);
+			else {
+				eprint("usage: midi(output,close,#)\n");
+				goto getout;
+			}
+
+			mdep_popup("TJT DEBUG midi output close");	
+
+			if ( ! validinputport(portno) ) {
+				eprint("midi: invalid output port number %d !?\n",portno);
+				goto getout;
+			}
+			if ( Midioutputs[portno-1].opened == 0 ) {
+				eprint("midi: output port %d is not open !?\n",portno);
+				goto getout;
+			}
 			r = mdep_midi(MIDI_CLOSE_OUTPUT,&Midioutputs[portno-1]);
 			if ( r == 0 )
 				Midioutputs[portno-1].opened = 0;
@@ -2232,11 +2270,21 @@ bi_midi(int argc)
 		else if ( strcmp(arg1,"open")==0 ) {
 			if ( argc > 2 )
 				portno = neednum("midi",ARG(2));
-			else
-				execerror("usage: midi(output,open,#)\n");
-			chkoutputport(portno);
-			if ( Midioutputs[portno-1].opened == 1 )
-				execerror("midi: output port %d is already open !?\n",portno);
+			else {
+				eprint("usage: midi(output,open,#)\n");
+				goto getout;
+			}
+
+			mdep_popup("TJT DEBUG midi output open");	
+
+			if ( ! validoutputport(portno) ) {
+				eprint("midi: invalid output port number %d !?\n",portno);
+				goto getout;
+			}
+			if ( Midioutputs[portno-1].opened == 1 ) {
+				eprint("midi: output port %d is already open !?\n",portno);
+				goto getout;
+			}
 			r = mdep_midi(MIDI_OPEN_OUTPUT,&Midioutputs[portno-1]);
 			if ( r == 0 ) {
 				Midioutputs[portno-1].opened = 1;
@@ -2255,13 +2303,22 @@ bi_midi(int argc)
 		else if ( strcmp(arg1,"isopen")==0 ) {
 			if ( argc > 2 )
 				portno = neednum("midi",ARG(2));
-			else
-				execerror("usage: midi(output,isopen,#)\n");
-			chkoutputport(portno);
+			else {
+				eprint("usage: midi(output,isopen,#)\n");
+				goto getout;
+			}
+
+			mdep_popup("TJT DEBUG midi output isopen");	
+
+			if ( ! validoutputport(portno) ) {
+				eprint("midi: invalid output port number %d !?\n",portno);
+				goto getout;
+			}
 			r = Midioutputs[portno-1].opened;
 			d = numdatum(r);
 		} else {
-			execerror("usage: midi(output,list/open/close/isopen,#)\n");
+			eprint("usage: midi(output,list/open/close/isopen,#)\n");
+			goto getout;
 		}
 	}
 	else if ( strcmp(arg0,"portmap")==0 ) {
@@ -2300,14 +2357,18 @@ bi_midi(int argc)
 			}
 		} else {
 			int ch, inportno, outportno;
-			if ( argc < 3 )
-				execerror("usage: midi(portmap,inport,chan,outport)\n");
+			if ( argc < 3 ) {
+				eprint("usage: midi(portmap,inport,chan,outport)\n");
+				goto getout;
+			}
 			/*
 			 * Usage is midi("portmap",inportnum,chan#,outportnum)
 			 */
 			inportno = neednum("midi",ARG(1));
-			if ( inportno != 0 )
-				chkinputport(inportno);
+			if ( ! validinputport(inportno) ) {
+				eprint("midi: invalid input port number %d !?\n",inportno);
+				goto getout;
+			}
 
 			/* Convert input portno to offset in Midiinputs */
 			if ( inportno > 0 )
@@ -2317,15 +2378,20 @@ bi_midi(int argc)
 
 			ch = neednum("midi",ARG(2)) - 1;
 			outportno = neednum("midi",ARG(3));
-			if ( outportno != 0 )
-				chkoutputport(outportno);
+			/* a value of 0 is okay, and indicates default output */
+			if ( outportno != 0 && ! validoutputport(outportno) ) {
+				eprint("midi: invalid output port number %d !?\n",outportno);
+				goto getout;
+			}
 			Portmap[p][ch] = outportno;
 		}
 	}
 	else {
 		/* unrecognized command */
-		execerror("midi: Unrecognized argument (%s).  Expecting \"input\" or \"output\".",arg0);
+		eprint("midi: Unrecognized argument (%s).  Expecting \"input\" or \"output\".",arg0);
+		goto getout;
 	}
+getout:
 	ret(d);
 #endif
 }

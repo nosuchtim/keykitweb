@@ -37,8 +37,9 @@ def compile_wasm():
         "-s", "ALLOW_MEMORY_GROWTH=1",
         "-s", "ASYNCIFY=1",  # Important for blocking calls
         "-s", "FORCE_FILESYSTEM=1",  # Enable virtual filesystem
-        "-s", "EXPORTED_FUNCTIONS=['_main','_mdep_on_midi_ready','_mdep_on_midi_message','_mdep_on_mouse_move','_mdep_on_mouse_button','_mdep_on_key_event']",
+        "-s", "EXPORTED_FUNCTIONS=['_main','_mdep_on_midi_message','_mdep_on_mouse_move','_mdep_on_mouse_button','_mdep_on_key_event']",
         "-s", "EXPORTED_RUNTIME_METHODS=['ccall','cwrap','getValue','setValue','UTF8ToString','FS']",
+        "-s", "ASSERTIONS=1",  # Enable runtime assertions
         "-D__EMSCRIPTEN__",
         "-Wno-implicit-function-declaration",
         "-Wno-int-conversion",
@@ -74,9 +75,9 @@ def compile_wasm():
         print(result.stderr)
         
         if result.returncode == 0:
-            print(f"\n✓ Successfully built {output}")
+            print(f"\nSuccessfully built {output}")
         else:
-            print(f"\n✗ Compilation failed with return code {result.returncode}")
+            print(f"\nCompilation failed with return code {result.returncode}")
             print("Check build_log.txt for details")
             sys.exit(1)
     except Exception as e:

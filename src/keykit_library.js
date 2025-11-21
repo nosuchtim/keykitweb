@@ -207,48 +207,10 @@ mergeInto(LibraryManager.library, {
     // Global MIDI access object
     js_request_midi_access__deps: ['$stringToUTF8'],
     js_request_midi_access: function () {
-        if (!window.midiAccess) {
-            window.midiInputs = [];
-            window.midiOutputs = [];
-
-            if (navigator.requestMIDIAccess) {
-                console.log('Requesting MIDI access...');
-                navigator.requestMIDIAccess({ sysex: false })
-                    .then(function(access) {
-                        console.log('MIDI access granted!');
-                        window.midiAccess = access;
-
-                        // Store inputs and outputs as arrays
-                        window.midiInputs = Array.from(access.inputs.values());
-                        window.midiOutputs = Array.from(access.outputs.values());
-
-                        console.log('Found ' + window.midiInputs.length + ' MIDI inputs');
-                        console.log('Found ' + window.midiOutputs.length + ' MIDI outputs');
-
-                        // Log device names
-                        window.midiInputs.forEach(function(input, index) {
-                            console.log('  Input ' + index + ': ' + input.name);
-                        });
-                        window.midiOutputs.forEach(function(output, index) {
-                            console.log('  Output ' + index + ': ' + output.name);
-                        });
-
-                        // Call back into C code when MIDI devices are ready
-                        if (typeof Module !== 'undefined' && Module.ccall) {
-                            Module.ccall('mdep_on_midi_ready', null, [], []);
-                        }
-                    })
-                    .catch(function(err) {
-                        console.error('MIDI access denied or error:', err);
-                        window.midiInputs = [];
-                        window.midiOutputs = [];
-                    });
-            } else {
-                console.warn('Web MIDI API not supported in this browser');
-                window.midiInputs = [];
-                window.midiOutputs = [];
-            }
-        }
+        // MIDI is already initialized in preRun (in keykit_shell.html)
+        // The devices are already in window.midiInputs and window.midiOutputs
+        // This function is just a no-op now
+        console.log('js_request_midi_access called (MIDI already initialized in preRun)');
     },
 
     // Get number of MIDI input devices

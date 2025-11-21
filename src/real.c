@@ -302,6 +302,10 @@ startrealtime(void)
 	unsigned u;
 	int n;
 
+	mdep_popup("TJT DEBUG in startrealtime AAA");
+	mdep_startrealtime();
+	mdep_popup("TJT DEBUG after mdep_startrealtime");
+
 	installnum("Noteqsize",&Noteqsize,256);
 
 	Noteq = (Notedata *) kmalloc((unsigned)(*Noteqsize) * sizeof(Notedata),"startreal");
@@ -323,16 +327,23 @@ startrealtime(void)
 
 	makeroom(256L,&Grabbuff,&Grabbuffsize);
 
-	for ( n=0; n<MIDI_IN_DEVICES; n++ )
-		initmidiport(&Midiinputs[n]);
-	for ( n=0; n<MIDI_OUT_DEVICES; n++ )
-		initmidiport(&Midioutputs[n]);
+	mdep_popup("TJT DEBUG in startrealtime BBB");
 
+	for ( n=0; n<MIDI_IN_DEVICES; n++ ) {
+		initmidiport(&Midiinputs[n]);
+	}
+	for ( n=0; n<MIDI_OUT_DEVICES; n++ ) {
+		initmidiport(&Midioutputs[n]);
+	}
+
+	mdep_popup("TJT DEBUG before mdep_initmidi");
 	if ( mdep_initmidi(Midiinputs,Midioutputs) == 0 ) {
 		Midiok = 1;
+		mdep_popup("TJT DEBUG before midiflush");
 		midiflush();
 		
 	}
+	mdep_popup("TJT DEBUG after mdep_initmidi");
 
 	/* Free existing phrases in Current and (if recording) Record */
 	resetcurrphr();

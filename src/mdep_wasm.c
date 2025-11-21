@@ -163,9 +163,7 @@ mdep_setcursor(int c)
 void
 mdep_prerc(void)
 {
-	eprint("mdep_prerc: Should be initializing colors maybe...\n");
-
-    // No-op
+    // No-op for now
 }
 
 void
@@ -222,13 +220,8 @@ static int midi_buffer_count = 0;
 static char midi_input_names[MIDI_IN_DEVICES][MAX_MIDI_DEVICE_NAME];
 static char midi_output_names[MIDI_OUT_DEVICES][MAX_MIDI_DEVICE_NAME];
 
-// Global MIDI port arrays (will be initialized when MIDI is ready)
-static Midiport *global_midi_inputs = NULL;
-static Midiport *global_midi_outputs = NULL;
+// MIDI initialization flag
 static int midi_initialized = 0;
-
-// Forward declaration
-static void initialize_midi_ports();
 
 // Callback from JavaScript when MIDI message is received
 EMSCRIPTEN_KEEPALIVE
@@ -249,21 +242,6 @@ void mdep_on_midi_message(int device_index, int status, int data1, int data2)
             midi_buffer_write_pos = 0;
 
         midi_buffer_count += 3;
-    }
-}
-
-// Callback from JavaScript when MIDI devices are ready
-EMSCRIPTEN_KEEPALIVE
-void mdep_on_midi_ready()
-{
-    printf("MIDI devices ready!\n");
-    printf("Found %d MIDI inputs and %d MIDI outputs\n",
-           js_get_midi_input_count(), js_get_midi_output_count());
-
-    // Now that devices are ready, initialize the MIDI ports
-    if (global_midi_inputs && global_midi_outputs) {
-        initialize_midi_ports();
-        midi_initialized = 1;
     }
 }
 
@@ -320,89 +298,60 @@ mdep_putnmidi(int n, char *cp, Midiport *pport)
     }
 }
 
-// Internal function to actually initialize MIDI ports once devices are ready
-static void initialize_midi_ports()
-{
-    int i;
-    int num_inputs = js_get_midi_input_count();
-    int num_outputs = js_get_midi_output_count();
-
-    printf("Initializing MIDI ports: %d inputs, %d outputs\n", num_inputs, num_outputs);
-
-    // Initialize MIDI input ports
-    for (i = 0; i < MIDI_IN_DEVICES; i++) {
-        if (i < num_inputs) {
-            // Get device name from Web MIDI API
-            js_get_midi_input_name(i, midi_input_names[i], MAX_MIDI_DEVICE_NAME);
-            global_midi_inputs[i].name = midi_input_names[i];
-            global_midi_inputs[i].opened = 0;
-            global_midi_inputs[i].private1 = i; // Store device index
-            printf("  MIDI Input %d: %s\n", i, global_midi_inputs[i].name);
-        } else {
-            global_midi_inputs[i].name = NULL;
-            global_midi_inputs[i].opened = 0;
-            global_midi_inputs[i].private1 = -1;
-        }
-    }
-
-    // Initialize MIDI output ports
-    for (i = 0; i < MIDI_OUT_DEVICES; i++) {
-        if (i < num_outputs) {
-            // Get device name from Web MIDI API
-            js_get_midi_output_name(i, midi_output_names[i], MAX_MIDI_DEVICE_NAME);
-            global_midi_outputs[i].name = midi_output_names[i];
-            global_midi_outputs[i].opened = 0;
-            global_midi_outputs[i].private1 = i; // Store device index
-            printf("  MIDI Output %d: %s\n", i, global_midi_outputs[i].name);
-        } else {
-            global_midi_outputs[i].name = NULL;
-            global_midi_outputs[i].opened = 0;
-            global_midi_outputs[i].private1 = -1;
-        }
-    }
-}
-
 int
 mdep_initmidi(Midiport *inputs, Midiport *outputs)
 {
     int i;
 
-    // Save pointers to port arrays for callback
-    global_midi_inputs = inputs;
-    global_midi_outputs = outputs;
+    mdep_popup("TJT DEBUG in mdep_initmidi =================");
 
     // Clear MIDI buffer
     midi_buffer_read_pos = 0;
     midi_buffer_write_pos = 0;
     midi_buffer_count = 0;
 
-    // Initialize all ports as empty for now
-    // They will be populated when mdep_on_midi_ready() is called
-    for (i = 0; i < MIDI_IN_DEVICES; i++) {
-        inputs[i].name = NULL;
-        inputs[i].opened = 0;
-        inputs[i].private1 = -1;
-    }
-
-    for (i = 0; i < MIDI_OUT_DEVICES; i++) {
-        outputs[i].name = NULL;
-        outputs[i].opened = 0;
-        outputs[i].private1 = -1;
-    }
-
-    // Check if MIDI is already ready (in case callback already happened)
+    // Get MIDI device counts (devices are already enumerated in preRun)
     int num_inputs = js_get_midi_input_count();
     int num_outputs = js_get_midi_output_count();
 
-    if (num_inputs > 0 || num_outputs > 0) {
-        // Devices already enumerated, initialize now
-        initialize_midi_ports();
-        midi_initialized = 1;
-        printf("MIDI was already initialized with %d inputs, %d outputs\n", num_inputs, num_outputs);
-    } else {
-        // Devices not ready yet, will be initialized by mdep_on_midi_ready()
-        printf("MIDI initialization deferred - waiting for Web MIDI API...\n");
+    sprintf(Msg1,"TJT DEBUG mdep_initmidi: inputs=%d outputs=%d\n", num_inputs, num_outputs);
+    mdep_popup(Msg1);
+
+    printf("Initializing MIDI ports: %d inputs, %d outputs\n", num_inputs, num_outputs);
+
+    // Initialize MIDI input ports directly
+    for (i = 0; i < MIDI_IN_DEVICES; i++) {
+        if (i < num_inputs) {
+            // Get device name from Web MIDI API
+            js_get_midi_input_name(i, midi_input_names[i], MAX_MIDI_DEVICE_NAME);
+            inputs[i].name = midi_input_names[i];
+            inputs[i].opened = 0;
+            inputs[i].private1 = i; // Store device index
+            printf("  MIDI Input %d: %s\n", i, inputs[i].name);
+        } else {
+            inputs[i].name = NULL;
+            inputs[i].opened = 0;
+            inputs[i].private1 = -1;
+        }
     }
+
+    // Initialize MIDI output ports directly
+    for (i = 0; i < MIDI_OUT_DEVICES; i++) {
+        if (i < num_outputs) {
+            // Get device name from Web MIDI API
+            js_get_midi_output_name(i, midi_output_names[i], MAX_MIDI_DEVICE_NAME);
+            outputs[i].name = midi_output_names[i];
+            outputs[i].opened = 0;
+            outputs[i].private1 = i; // Store device index
+            printf("  MIDI Output %d: %s\n", i, outputs[i].name);
+        } else {
+            outputs[i].name = NULL;
+            outputs[i].opened = 0;
+            outputs[i].private1 = -1;
+        }
+    }
+
+    midi_initialized = 1;
 
     return 0; // Success
 }
@@ -683,7 +632,7 @@ void
 mdep_startrealtime(void)
 {
     // Start realtime mode - request MIDI access
-    printf("Starting realtime mode - requesting MIDI access...\n");
+    mdep_popup("TJT DEBUG Starting realtime mode - requesting MIDI access...\n");
     js_request_midi_access();
 }
 

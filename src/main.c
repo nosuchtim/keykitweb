@@ -184,10 +184,18 @@ keystr(char *s)
 {
 	Codep cp;
 
+	sprintf(Msg1,"TJT DEBUG in keystr s=%s\n",s);
+	mdep_popup(Msg1);
+
 	T = newtask(instructs(""));
+	mdep_popup("TJT DEBUG after newtask\n");
 	cp = instructs(s);
-	if ( cp )
+	mdep_popup("TJT DEBUG after instructs\n");
+	if ( cp ) {
+		mdep_popup("TJT DEBUG calling nestinstruct\n");
 		nestinstruct(cp);
+	}
+	mdep_popup("TJT DEBUG after instructs\n");
 }
 
 /* defnonly(s) - warn if illegal definition */
@@ -639,6 +647,7 @@ void
 finalexit(int r)
 NO_RETURN_ATTRIBUTE
 {
+	mdep_popup("TJT DEBUG finalexit: Cleaning up and exiting...\n");
 	mdep_endmidi();
 	mdep_bye();
 	exit(r);
@@ -648,6 +657,7 @@ void
 realexit(int r)
 NO_RETURN_ATTRIBUTE
 {
+	mdep_popup("TJT DEBUG realexit: Finishing off...\n");
 	finishoff();
 	closeallfifos();	/* so ports get closed */
 	finalexit(r);
@@ -657,6 +667,9 @@ void
 fatalerror(char *s)
 NO_RETURN_ATTRIBUTE
 {
+	sprintf(Msg1,"TJT DEBUG fatalerror: %s",s);	
+	mdep_popup(Msg1);
+
 	strcpy(Msg1,s);
 	strcat(Msg1,"\n");
 	eprint(Msg1);
@@ -695,6 +708,10 @@ void
 eprint(char *fmt,...)
 {
 	va_list args;
+
+	makeroom(1024+2*(long)strlen(fmt),&Msgt,&Msgtsize);
+	vsprintf(Msgt,fmt,args);
+	mdep_popup(Msgt);
 
 	va_start(args,fmt);
 	kdoprnt(1,stderr,fmt,args);
@@ -1689,7 +1706,9 @@ MAIN(int argc,char **argv)
 	realConsolefd = Consolefd;
 	Consolefd = -1;
 
+	mdep_popup("TJT DEBUG before keystart()");
 	keystart();
+	mdep_popup("TJT DEBUG after keystart()");
 
 	if ((p = getenv("KEYPAGEPERSISTENT")) != NULL) {
 		*Keypagepersistent = uniqstr(p);
@@ -1789,12 +1808,16 @@ MAIN(int argc,char **argv)
 	/* probably has something to do with end-of-file, or something.    */
 	/* For startgraphics(), we restore the real Consolefd for linux.   */
 	Consolefd = realConsolefd;
+	mdep_popup("TJT DEBUG before startgraphics");
 	startgraphics();
 	Consolefd = -1;
 
+	mdep_popup("TJT DEBUG before startrealtime");
 	startrealtime();
+	mdep_popup("TJT DEBUG before startreboot");
 	startreboot();
 
+	mdep_popup("TJT DEBUG before initsyms2");
 	initsyms2();	/* for stuff that gets set in startgraphics, mainly */
 	if ( Errfileit )
 		*Loadverbose = 1;
@@ -1802,18 +1825,24 @@ MAIN(int argc,char **argv)
 	ReadytoEval = 1;
 	go_interactive = 1;
 
+	mdep_popup("TJT DEBUG before argc loop");
 	while ( argc-- > 0 ) {
 		char *arg = *argv++;
 		char *suff = strrchr(arg,'.');
 
 		if ( strcmp(arg,"-") == 0 ) {
 			/* Start up an interactive command interpreter */
+			mdep_popup("TJT DEBUG starting interactive argc loop");
 			Consolefd = realConsolefd;
 			if ( do_rc ) {
+				mdep_popup("TJT DEBUG calling keyrc()");
 				keystr("keyrc();");
+				mdep_popup("TJT DEBUG after keyrc()");
 				do_rc = 0;
 			}
+			mdep_popup("TJT DEBUG before exectasks()");	
 			exectasks(0);
+			mdep_popup("TJT DEBUG after exectasks()");	
 			Consolefd = -1;
 
 			go_interactive = 0;
@@ -1856,6 +1885,7 @@ MAIN(int argc,char **argv)
 		keyfile(arg,FLAGERROR);
 		exectasks(0);
 	}
+	mdep_popup("TJT DEBUG before interactive");
 	if ( go_interactive ) {
 		Consolefd = realConsolefd;
 		if ( do_rc )
@@ -1863,6 +1893,7 @@ MAIN(int argc,char **argv)
 		exectasks(0);
 		Consolefd = -1;
 	}
+	mdep_popup("TJT DEBUG after interactive");
 
 	finalexit(nerrs);
 	return(nerrs);	/* what the hey... */

@@ -163,7 +163,7 @@ restartexec(void)
 NO_RETURN_ATTRIBUTE
 {
 	/* longjmp(Begin,1); */
-	eprint("restartexec does nothing, calling clean_exit!\n");
+	mdep_popup("TJT DEBUG restartexec does nothing, doing immediate and clean_exit!\n");
 	mdep_endmidi();
 	mdep_bye();
 	exit(0);
@@ -694,7 +694,8 @@ loadsym(Symbolp s,int pushit)
 	int nerrs;
 	Datum d;
 
-	eprint("loadsym: Loading symbol '%s'\n",symname(s));
+	sprintf(Msg1,"TJT DEBUG loading symbol '%s' in loadsym",symname(s));
+	mdep_popup(Msg1);
 
 #ifdef TRYTHISEVENTUALLY
 	clearsym(s);
@@ -2389,9 +2390,7 @@ inittasks(void)
 		Tasktable = newht( p ? atoi(p) : 67 );
 	}
 
-	mdep_popup("TJT DEBUG inittasks A\n");
 	Ireboot = instructs("Rebootfunc();");
-	mdep_popup("TJT DEBUG inittasks B\n");
 
 	pushiseg();
 	code(funcinst(I_POPVAL));

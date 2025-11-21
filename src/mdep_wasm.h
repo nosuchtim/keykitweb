@@ -6,6 +6,7 @@
 #define MDEP_WASM_H
 
 #define MACHINE "wasm"
+#define MDEP_MIDI_PROVIDED
 
 #include <stdio.h>
 #include <stdlib.h>

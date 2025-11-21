@@ -9,6 +9,8 @@
 
 function keyrc() {
 
+	print("HELLOOOOOO from Keykit print statement!!!!!\n")
+
 	global(prerc)	# bug workaround
 	global(postrc)	# bug workaround
 	Prercfuncs = []

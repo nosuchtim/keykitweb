@@ -1237,3 +1237,5 @@ Hey, mdep_statmidi is no longer used!
 extern FILE *FF;
 #endif
 #define funcinst(x) realfuncinst((BYTEFUNC)(x))
+
+#include "debug_utils.h"
