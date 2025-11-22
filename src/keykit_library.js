@@ -93,6 +93,32 @@ mergeInto(LibraryManager.library, {
         ctx.fillText(UTF8ToString(text), x, y);
     },
 
+    // Get font height (font metrics)
+    js_get_font_height: function () {
+        var canvas = document.getElementById('keykit-canvas');
+        if (!canvas) return 16;  // default fallback
+        var ctx = canvas.getContext('2d');
+        var metrics = ctx.measureText('M');
+        // Use actualBoundingBoxAscent + actualBoundingBoxDescent if available
+        // Otherwise estimate from font size
+        if (metrics.actualBoundingBoxAscent !== undefined &&
+            metrics.actualBoundingBoxDescent !== undefined) {
+            return Math.ceil(metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent);
+        }
+        // Fallback: extract font size from font string (e.g., "16px monospace")
+        var fontSize = parseInt(ctx.font.match(/(\d+)px/));
+        return fontSize || 16;
+    },
+
+    // Get font width (measure width of 'M' character)
+    js_get_font_width: function () {
+        var canvas = document.getElementById('keykit-canvas');
+        if (!canvas) return 8;  // default fallback
+        var ctx = canvas.getContext('2d');
+        var metrics = ctx.measureText('M');
+        return Math.ceil(metrics.width);
+    },
+
     // Draw filled polygon
     js_fill_polygon: function (xPoints, yPoints, numPoints) {
         var canvas = document.getElementById('keykit-canvas');
@@ -405,6 +431,9 @@ mergeInto(LibraryManager.library, {
                 return;
             }
 
+            // Prevent browser from handling keyboard shortcuts
+            e.preventDefault();
+
             // Use e.key to get the actual character (respects shift, caps lock, etc.)
             // For single characters, use charCodeAt to get the ASCII/Unicode value
             var keyCode;
@@ -418,11 +447,11 @@ mergeInto(LibraryManager.library, {
 
             window.keykitKeyBuffer.push(keyCode);
 
-            // Call C callback if defined
+            // Call C callback with modifier key state
             if (typeof Module !== 'undefined' && Module.ccall) {
                 Module.ccall('mdep_on_key_event', null,
-                             ['number', 'number'],
-                             [1, keyCode]);
+                             ['number', 'number', 'number', 'number', 'number'],
+                             [1, keyCode, e.ctrlKey ? 1 : 0, e.shiftKey ? 1 : 0, e.altKey ? 1 : 0]);
             }
         });
 
@@ -434,6 +463,9 @@ mergeInto(LibraryManager.library, {
                 return;
             }
 
+            // Prevent browser from handling keyboard shortcuts
+            e.preventDefault();
+
             var keyCode;
             if (e.key && e.key.length === 1) {
                 keyCode = e.key.charCodeAt(0);
@@ -443,8 +475,8 @@ mergeInto(LibraryManager.library, {
 
             if (typeof Module !== 'undefined' && Module.ccall) {
                 Module.ccall('mdep_on_key_event', null,
-                             ['number', 'number'],
-                             [0, keyCode]);
+                             ['number', 'number', 'number', 'number', 'number'],
+                             [0, keyCode, e.ctrlKey ? 1 : 0, e.shiftKey ? 1 : 0, e.altKey ? 1 : 0]);
             }
         });
 

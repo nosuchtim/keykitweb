@@ -4493,6 +4493,30 @@ async function createWasm() {
           return canvas ? canvas.width : 0;
       }
 
+  function _js_get_font_height() {
+          var canvas = document.getElementById('keykit-canvas');
+          if (!canvas) return 16;  // default fallback
+          var ctx = canvas.getContext('2d');
+          var metrics = ctx.measureText('M');
+          // Use actualBoundingBoxAscent + actualBoundingBoxDescent if available
+          // Otherwise estimate from font size
+          if (metrics.actualBoundingBoxAscent !== undefined &&
+              metrics.actualBoundingBoxDescent !== undefined) {
+              return Math.ceil(metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent);
+          }
+          // Fallback: extract font size from font string (e.g., "16px monospace")
+          var fontSize = parseInt(ctx.font.match(/(\d+)px/));
+          return fontSize || 16;
+      }
+
+  function _js_get_font_width() {
+          var canvas = document.getElementById('keykit-canvas');
+          if (!canvas) return 8;  // default fallback
+          var ctx = canvas.getContext('2d');
+          var metrics = ctx.measureText('M');
+          return Math.ceil(metrics.width);
+      }
+
   function _js_get_image_data(x, y, width, height, buffer) {
           var canvas = document.getElementById('keykit-canvas');
           if (!canvas) return 0;
@@ -4650,6 +4674,9 @@ async function createWasm() {
                   return;
               }
   
+              // Prevent browser from handling keyboard shortcuts
+              e.preventDefault();
+  
               // Use e.key to get the actual character (respects shift, caps lock, etc.)
               // For single characters, use charCodeAt to get the ASCII/Unicode value
               var keyCode;
@@ -4663,11 +4690,11 @@ async function createWasm() {
   
               window.keykitKeyBuffer.push(keyCode);
   
-              // Call C callback if defined
+              // Call C callback with modifier key state
               if (typeof Module !== 'undefined' && Module.ccall) {
                   Module.ccall('mdep_on_key_event', null,
-                               ['number', 'number'],
-                               [1, keyCode]);
+                               ['number', 'number', 'number', 'number', 'number'],
+                               [1, keyCode, e.ctrlKey ? 1 : 0, e.shiftKey ? 1 : 0, e.altKey ? 1 : 0]);
               }
           });
   
@@ -4679,6 +4706,9 @@ async function createWasm() {
                   return;
               }
   
+              // Prevent browser from handling keyboard shortcuts
+              e.preventDefault();
+  
               var keyCode;
               if (e.key && e.key.length === 1) {
                   keyCode = e.key.charCodeAt(0);
@@ -4688,8 +4718,8 @@ async function createWasm() {
   
               if (typeof Module !== 'undefined' && Module.ccall) {
                   Module.ccall('mdep_on_key_event', null,
-                               ['number', 'number'],
-                               [0, keyCode]);
+                               ['number', 'number', 'number', 'number', 'number'],
+                               [0, keyCode, e.ctrlKey ? 1 : 0, e.shiftKey ? 1 : 0, e.altKey ? 1 : 0]);
               }
           });
   
@@ -5715,7 +5745,7 @@ function assignWasmExports(wasmExports) {
   _mdep_on_midi_message = Module['_mdep_on_midi_message'] = createExportWrapper('mdep_on_midi_message', 4);
   _mdep_on_mouse_move = Module['_mdep_on_mouse_move'] = createExportWrapper('mdep_on_mouse_move', 2);
   _mdep_on_mouse_button = Module['_mdep_on_mouse_button'] = createExportWrapper('mdep_on_mouse_button', 4);
-  _mdep_on_key_event = Module['_mdep_on_key_event'] = createExportWrapper('mdep_on_key_event', 2);
+  _mdep_on_key_event = Module['_mdep_on_key_event'] = createExportWrapper('mdep_on_key_event', 5);
   _emscripten_stack_get_end = wasmExports['emscripten_stack_get_end'];
   _emscripten_stack_get_base = wasmExports['emscripten_stack_get_base'];
   _emscripten_stack_init = wasmExports['emscripten_stack_init'];
@@ -5812,6 +5842,10 @@ var wasmImports = {
   js_get_canvas_height: _js_get_canvas_height,
   /** @export */
   js_get_canvas_width: _js_get_canvas_width,
+  /** @export */
+  js_get_font_height: _js_get_font_height,
+  /** @export */
+  js_get_font_width: _js_get_font_width,
   /** @export */
   js_get_image_data: _js_get_image_data,
   /** @export */

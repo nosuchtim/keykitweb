@@ -22,6 +22,8 @@ extern void js_set_stroke_color(const char *color);
 extern void js_set_fill_color(const char *color);
 extern void js_set_line_width(int width);
 extern void js_set_font(const char *font);
+extern int js_get_font_height();
+extern int js_get_font_width();
 extern int js_get_canvas_width();
 extern int js_get_canvas_height();
 extern void js_set_alpha(float alpha);
@@ -225,11 +227,23 @@ static int midi_buffer_write_pos = 0;
 static int midi_buffer_count = 0;
 
 // Keyboard input buffer for incoming keypresses
+typedef struct {
+    int keycode;
+    int ctrl;
+    int shift;
+    int alt;
+} KeyEvent;
+
 #define KEYBOARD_BUFFER_SIZE 256
-static int keyboard_buffer[KEYBOARD_BUFFER_SIZE];
+static KeyEvent keyboard_buffer[KEYBOARD_BUFFER_SIZE];
 static int keyboard_buffer_read_pos = 0;
 static int keyboard_buffer_write_pos = 0;
 static int keyboard_buffer_count = 0;
+
+// Current modifier key state (maintained for backwards compatibility)
+static int current_ctrl_down = 0;
+static int current_shift_down = 0;
+static int current_alt_down = 0;
 
 // Mouse event buffer structure
 typedef struct {
@@ -328,12 +342,21 @@ void mdep_on_mouse_button(int down, int x, int y, int buttons)
 
 // Callback from JavaScript for keyboard events
 EMSCRIPTEN_KEEPALIVE
-void mdep_on_key_event(int down, int keycode)
+void mdep_on_key_event(int down, int keycode, int ctrl, int shift, int alt)
 {
+    // Update modifier key state
+    current_ctrl_down = ctrl;
+    current_shift_down = shift;
+    current_alt_down = alt;
+
     // Only buffer key down events
     if (down == 1) {
         if (keyboard_buffer_count < KEYBOARD_BUFFER_SIZE) {
-            keyboard_buffer[keyboard_buffer_write_pos++] = keycode;
+            keyboard_buffer[keyboard_buffer_write_pos].keycode = keycode;
+            keyboard_buffer[keyboard_buffer_write_pos].ctrl = ctrl;
+            keyboard_buffer[keyboard_buffer_write_pos].shift = shift;
+            keyboard_buffer[keyboard_buffer_write_pos].alt = alt;
+            keyboard_buffer_write_pos++;
             if (keyboard_buffer_write_pos >= KEYBOARD_BUFFER_SIZE)
                 keyboard_buffer_write_pos = 0;
             keyboard_buffer_count++;
@@ -343,6 +366,23 @@ void mdep_on_key_event(int down, int keycode)
     }
 }
 
+// Helper functions to check modifier key state
+int mdep_ctrl_down(void)
+{
+    return current_ctrl_down;
+}
+
+int mdep_shift_down(void)
+{
+    return current_shift_down;
+}
+
+int mdep_alt_down(void)
+{
+    return current_alt_down;
+}
+
+// Helper functions for mouse event buffer access
 int mdep_get_mouse_event(int *x, int *y, int *buttons, int *event_type)
 {
     if (mouse_buffer_count > 0) {
@@ -993,12 +1033,25 @@ mdep_getconsole(void)
 {
     // Return next keycode from buffer, or -1 if empty
     if (keyboard_buffer_count > 0) {
-        int keycode = keyboard_buffer[keyboard_buffer_read_pos++];
+        KeyEvent *event = &keyboard_buffer[keyboard_buffer_read_pos];
+        int keycode = event->keycode;
+
+        // Update current modifier state to match this key event
+        current_ctrl_down = event->ctrl;
+        current_shift_down = event->shift;
+        current_alt_down = event->alt;
+
+        keyboard_buffer_read_pos++;
         if (keyboard_buffer_read_pos >= KEYBOARD_BUFFER_SIZE)
             keyboard_buffer_read_pos = 0;
         keyboard_buffer_count--;
-		sprintf(Msg1,"TJT DEBUG mdep_getconsole got keycode %d\n",keycode);
-		mdep_popup(Msg1);
+
+		if ( keycode == 'h' && current_ctrl_down ) {
+			keycode = 8; // Ctrl-H as Backspace
+		}
+        // sprintf(Msg1,"TJT DEBUG mdep_getconsole got keycode %d (ctrl=%d shift=%d alt=%d)\n",
+        //     keycode, event->ctrl, event->shift, event->alt);
+        // mdep_popup(Msg1);
         return keycode;
     }
     return -1;  // No key available
@@ -1029,13 +1082,13 @@ mdep_maxy(void)
 int
 mdep_fontwidth(void)
 {
-    return 8; // Default monospace width
+    return js_get_font_width();
 }
 
 int
 mdep_fontheight(void)
 {
-    return 16; // Default monospace height
+    return js_get_font_height();
 }
 
 void
@@ -1048,9 +1101,10 @@ void
 mdep_string(int x, int y, char *s)
 {
     if (s && *s) {
-		printf(stderr,"TJT DEBUG mdep_string is calling js_draw_text at %d,%d: %s\n", x, y, s);
+		// printf(stderr,"TJT DEBUG mdep_string is calling js_draw_text at %d,%d: %s\n", x, y, s);
 		// mdep_popup(Msg1);
-        js_draw_text(x, y, s);
+		// printf("TJT DEBUG mdep_string s=%s\n",s);
+        js_draw_text(x, y + mdep_fontheight(), s);
     }
 }
 
@@ -1087,6 +1141,7 @@ void
 mdep_color(int c)
 {
     update_color_from_index(c);
+	printf("mdep_color setting color index %d -> %s\n", c, current_color_rgb);
     js_set_color(current_color_rgb);
 }
 

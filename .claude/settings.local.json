@@ -3,7 +3,9 @@
     "allow": [
       "Bash(build_examples.bat)",
       "Bash(cmd //c build_examples.bat)",
-      "Bash(bash build_examples.bat)"
+      "Bash(bash build_examples.bat)",
+      "Bash(python build_wasm.py:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []
