@@ -398,8 +398,24 @@ mergeInto(LibraryManager.library, {
         window.keykitKeyBuffer = [];
 
         document.addEventListener('keydown', function(e) {
-            // Store key code for polling
-            var keyCode = e.keyCode || e.which;
+            // Ignore modifier keys (Shift, Ctrl, Alt, Meta, etc.)
+            if (e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' ||
+                e.key === 'Meta' || e.key === 'CapsLock' || e.key === 'Tab' ||
+                e.key === 'NumLock' || e.key === 'ScrollLock') {
+                return;
+            }
+
+            // Use e.key to get the actual character (respects shift, caps lock, etc.)
+            // For single characters, use charCodeAt to get the ASCII/Unicode value
+            var keyCode;
+            if (e.key && e.key.length === 1) {
+                // Single character - get its character code (respects case)
+                keyCode = e.key.charCodeAt(0);
+            } else {
+                // Special keys - use keyCode
+                keyCode = e.keyCode || e.which;
+            }
+
             window.keykitKeyBuffer.push(keyCode);
 
             // Call C callback if defined
@@ -411,7 +427,19 @@ mergeInto(LibraryManager.library, {
         });
 
         document.addEventListener('keyup', function(e) {
-            var keyCode = e.keyCode || e.which;
+            // Ignore modifier keys
+            if (e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' ||
+                e.key === 'Meta' || e.key === 'CapsLock' || e.key === 'Tab' ||
+                e.key === 'NumLock' || e.key === 'ScrollLock') {
+                return;
+            }
+
+            var keyCode;
+            if (e.key && e.key.length === 1) {
+                keyCode = e.key.charCodeAt(0);
+            } else {
+                keyCode = e.keyCode || e.which;
+            }
 
             if (typeof Module !== 'undefined' && Module.ccall) {
                 Module.ccall('mdep_on_key_event', null,

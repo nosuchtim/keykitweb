@@ -22,9 +22,9 @@ function keyrc() {
 		addprerc(prerc)
 	}
 
-	print("TESTING 333\n")
+	print("keyrc DEBUG 333\n")
 	dokeylocal()
-	print("TESTING 4444\n")
+	print("keyrc DEBUG 4444\n")
 
 	updatelib(0,1)	# Update the keylib.k files, if anything's changed.
 			# The second argument (1) forces a rekeylib()
@@ -70,23 +70,13 @@ function addpostrc(f) {
 function dokeylocal() {
 
 	# KEYOUT environment variable is default output port
-	print("dokeylocal AA")
 	outportname = mdep("env","get","KEYOUT")
-	print("dokeylocal BBX1")
-	print("dokeylocal BBX111 outportname = ",outportname)
 	if ( defined(outportname) && (outportname != "") ) {
-		print("dokeylocal BBX2")
-		print("dokeylocal CC "+outportname)
-		print("dokeylocal BBX3")
 		out = outport(outportname)
-		print("dokeylocal DD")
 		if ( out >= 0 ) {
-			print("dokeylocal EE")
 			mapport(0,out)
 		}
 	}
-	print("dokeylocal BBX4")
-	print("dokeylocal FF")
 
 	# KEYIN environment variable is default input port
 	inportname = mdep("env","get","KEYIN")
@@ -94,20 +84,17 @@ function dokeylocal() {
 		inp = inport(inportname)
 	}
 
-	print("dokeylocal Keylocal")
 	if ( defined(Keylocal) ) {
 		eval "#include "+Keylocal
 		keylocal()
 		return()
 	}
 
-	print("dokeylocal XX1")
 	if ( fileexists("keylocal.k") ) {
 		eval "#include keylocal.k"
 		keylocal()
 		return()
 	}
-	print("dokeylocal XX2")
 
 	# See if it's in some global place
 	if ( Machine == "win" ) {
@@ -130,9 +117,7 @@ function dokeylocal() {
 		}
 	}
 
-	print("dokeylocal XX3")
 	fname = pathsearch("keylocal.k")
-	print("dokeylocal XX4")
 	if ( fname != "" ) {
 		eval "#include \""+fname+"\""
 		keylocal()

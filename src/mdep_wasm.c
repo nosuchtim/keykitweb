@@ -997,6 +997,8 @@ mdep_getconsole(void)
         if (keyboard_buffer_read_pos >= KEYBOARD_BUFFER_SIZE)
             keyboard_buffer_read_pos = 0;
         keyboard_buffer_count--;
+		sprintf(Msg1,"TJT DEBUG mdep_getconsole got keycode %d\n",keycode);
+		mdep_popup(Msg1);
         return keycode;
     }
     return -1;  // No key available
@@ -1046,6 +1048,8 @@ void
 mdep_string(int x, int y, char *s)
 {
     if (s && *s) {
+		printf(stderr,"TJT DEBUG mdep_string is calling js_draw_text at %d,%d: %s\n", x, y, s);
+		// mdep_popup(Msg1);
         js_draw_text(x, y, s);
     }
 }
