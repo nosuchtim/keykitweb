@@ -46,6 +46,11 @@ extern void js_setup_keyboard_events();
 extern int js_get_key();
 extern int js_has_key();
 
+// Bitmap functions
+extern int js_get_image_data(int x, int y, int width, int height, unsigned char *buffer);
+extern void js_put_image_data(unsigned char *buffer, int bufLen, int x, int y, int width, int height);
+extern void js_copy_bitmap_region(int fromx, int fromy, int width, int height, int tox, int toy);
+
 // Global state for graphics
 static int current_color_index = 0;
 static char current_color_rgb[32] = "rgb(0,0,0)";
@@ -1100,7 +1105,6 @@ mdep_boxfill(int x0, int y0, int x1, int y1)
     int y = (y0 < y1) ? y0 : y1;
     int w = abs(x1 - x0);
     int h = abs(y1 - y0);
-    mdep_popup("TJT DEBUG mdep_boxfill is calling js_fill_rect\n");
     printf("TJT DEBUG mdep_boxfill is calling js_fill_rect %d,%d,%d,%d\n", x, y, w, h   );
     js_fill_rect(x, y, w, h);
 }
@@ -1138,7 +1142,13 @@ mdep_fillpolygon(int *x, int *y, int n)
 void
 mdep_freebitmap(Pbitmap b)
 {
-    // TODO: Free bitmap memory
+    if (b) {
+        if (b->ptr) {
+            free(b->ptr);
+            b->ptr = NULL;
+        }
+        free(b);
+    }
 }
 
 int
@@ -1288,7 +1298,15 @@ mdep_allocbitmap(int xsize, int ysize)
         pb->ysize = ysize;
         pb->origx = xsize;
         pb->origy = ysize;
-        pb->ptr = NULL; // TODO: Allocate actual bitmap data
+        // Allocate RGBA pixel data (4 bytes per pixel)
+        int bufsize = xsize * ysize * 4;
+        pb->ptr = (unsigned char *)malloc(bufsize);
+        if (pb->ptr) {
+            memset(pb->ptr, 0, bufsize); // Clear to transparent black
+        } else {
+            free(pb);
+            return NULL;
+        }
     }
     return pb;
 }
@@ -1297,9 +1315,29 @@ Pbitmap
 mdep_reallocbitmap(int xsize, int ysize, Pbitmap pb)
 {
     if (pb) {
-        pb->xsize = xsize;
-        pb->ysize = ysize;
-        // TODO: Reallocate bitmap data
+        sprintf(Msg1,"TJT DEBUG mdep_reallocbitmap to size (%d,%d)\n",
+            xsize, ysize);
+        mdep_popup(Msg1);
+
+        // If dimensions changed, reallocate buffer
+        if (xsize != pb->origx || ysize != pb->origy) {
+            int bufsize = xsize * ysize * 4;
+            unsigned char *newptr = (unsigned char *)realloc(pb->ptr, bufsize);
+            if (newptr) {
+                pb->ptr = newptr;
+                pb->origx = xsize;
+                pb->origy = ysize;
+                pb->xsize = xsize;
+                pb->ysize = ysize;
+            } else {
+                // Realloc failed, keep old buffer
+                return pb;
+            }
+        } else {
+            // Just update size (within existing allocation)
+            pb->xsize = xsize;
+            pb->ysize = ysize;
+        }
     }
     return pb;
 }
@@ -1307,19 +1345,42 @@ mdep_reallocbitmap(int xsize, int ysize, Pbitmap pb)
 void
 mdep_movebitmap(int fromx0, int fromy0, int width, int height, int tox0, int toy0)
 {
-    // TODO: Move bitmap region
+    sprintf(Msg1,"TJT DEBUG mdep_movebitmap from (%d,%d) size (%d,%d) to (%d,%d)\n",
+        fromx0, fromy0, width, height, tox0, toy0);
+    mdep_popup(Msg1);
+
+    // Copy a region of the canvas from one location to another
+    js_copy_bitmap_region(fromx0, fromy0, width, height, tox0, toy0);
 }
 
 void
 mdep_pullbitmap(int x0, int y0, Pbitmap pb)
 {
-    // TODO: Copy from screen to bitmap
+    sprintf(Msg1,"TJT DEBUG mdep_pullbitmap at (%d,%d) size (%d,%d)\n",
+        x0, y0, pb->xsize, pb->ysize);
+    mdep_popup(Msg1);
+
+    // Copy pixels from canvas to bitmap buffer
+    if (pb && pb->ptr) {
+        int bytes = js_get_image_data(x0, y0, pb->xsize, pb->ysize, pb->ptr);
+        if (bytes == 0) {
+            printf("Warning: mdep_pullbitmap failed to get image data\n");
+        }
+    }
 }
 
 void
 mdep_putbitmap(int x0, int y0, Pbitmap pb)
 {
-    // TODO: Copy from bitmap to screen
+    sprintf(Msg1,"TJT DEBUG mdep_putbitmap at (%d,%d) size (%d,%d)\n",
+        x0, y0, pb->xsize, pb->ysize);
+    mdep_popup(Msg1);
+
+    // Copy pixels from bitmap buffer to canvas
+    if (pb && pb->ptr) {
+        int bufsize = pb->xsize * pb->ysize * 4; // RGBA
+        js_put_image_data(pb->ptr, bufsize, x0, y0, pb->xsize, pb->ysize);
+    }
 }
 
 void

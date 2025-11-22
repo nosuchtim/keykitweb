@@ -38,7 +38,7 @@ def compile_wasm():
         "-s", "ASYNCIFY=1",  # Important for blocking calls
         "-s", "FORCE_FILESYSTEM=1",  # Enable virtual filesystem
         "-s", "EXPORTED_FUNCTIONS=['_main','_mdep_on_midi_message','_mdep_on_mouse_move','_mdep_on_mouse_button','_mdep_on_key_event']",
-        "-s", "EXPORTED_RUNTIME_METHODS=['ccall','cwrap','getValue','setValue','UTF8ToString','FS']",
+        "-s", "EXPORTED_RUNTIME_METHODS=['ccall','cwrap','getValue','setValue','UTF8ToString','FS','HEAPU8']",
         "-s", "ASSERTIONS=1",  # Enable runtime assertions
         "-D__EMSCRIPTEN__",
         "-Wno-implicit-function-declaration",

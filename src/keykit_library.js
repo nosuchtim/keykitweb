@@ -434,5 +434,57 @@ mergeInto(LibraryManager.library, {
     // Check if key is available
     js_has_key: function () {
         return (window.keykitKeyBuffer && window.keykitKeyBuffer.length > 0) ? 1 : 0;
+    },
+
+    // ========== Bitmap Functions ==========
+
+    // Get image data from canvas and copy to C buffer
+    js_get_image_data: function (x, y, width, height, buffer) {
+        var canvas = document.getElementById('keykit-canvas');
+        if (!canvas) return 0;
+        var ctx = canvas.getContext('2d');
+
+        try {
+            var imageData = ctx.getImageData(x, y, width, height);
+            // Copy RGBA pixel data to C buffer
+            Module.HEAPU8.set(imageData.data, buffer);
+            return imageData.data.length; // Return number of bytes
+        } catch (e) {
+            console.error('js_get_image_data error:', e);
+            return 0;
+        }
+    },
+
+    // Put image data from C buffer to canvas
+    js_put_image_data: function (buffer, bufLen, x, y, width, height) {
+        var canvas = document.getElementById('keykit-canvas');
+        if (!canvas) return;
+        var ctx = canvas.getContext('2d');
+
+        try {
+            var imageData = ctx.createImageData(width, height);
+            // Copy from C buffer to ImageData
+            var srcData = new Uint8Array(Module.HEAPU8.buffer, buffer, bufLen);
+            imageData.data.set(srcData);
+            ctx.putImageData(imageData, x, y);
+        } catch (e) {
+            console.error('js_put_image_data error:', e);
+        }
+    },
+
+    // Copy bitmap region (for mdep_movebitmap)
+    js_copy_bitmap_region: function (fromx, fromy, width, height, tox, toy) {
+        var canvas = document.getElementById('keykit-canvas');
+        if (!canvas) return;
+        var ctx = canvas.getContext('2d');
+
+        try {
+            // Get the source region
+            var imageData = ctx.getImageData(fromx, fromy, width, height);
+            // Put it at the destination
+            ctx.putImageData(imageData, tox, toy);
+        } catch (e) {
+            console.error('js_copy_bitmap_region error:', e);
+        }
     }
 });

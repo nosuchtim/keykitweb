@@ -482,7 +482,7 @@ function updateMemoryViews() {
   var b = wasmMemory.buffer;
   HEAP8 = new Int8Array(b);
   HEAP16 = new Int16Array(b);
-  HEAPU8 = new Uint8Array(b);
+  Module['HEAPU8'] = HEAPU8 = new Uint8Array(b);
   HEAPU16 = new Uint16Array(b);
   HEAP32 = new Int32Array(b);
   HEAPU32 = new Uint32Array(b);
@@ -4493,6 +4493,22 @@ async function createWasm() {
           return canvas ? canvas.width : 0;
       }
 
+  function _js_get_image_data(x, y, width, height, buffer) {
+          var canvas = document.getElementById('keykit-canvas');
+          if (!canvas) return 0;
+          var ctx = canvas.getContext('2d');
+  
+          try {
+              var imageData = ctx.getImageData(x, y, width, height);
+              // Copy RGBA pixel data to C buffer
+              Module.HEAPU8.set(imageData.data, buffer);
+              return imageData.data.length; // Return number of bytes
+          } catch (e) {
+              console.error('js_get_image_data error:', e);
+              return 0;
+          }
+      }
+
   function _js_get_midi_input_count() {
           if (!window.midiInputs) {
               return 0;
@@ -4552,6 +4568,22 @@ async function createWasm() {
           };
   
           return 0; // Success
+      }
+
+  function _js_put_image_data(buffer, bufLen, x, y, width, height) {
+          var canvas = document.getElementById('keykit-canvas');
+          if (!canvas) return;
+          var ctx = canvas.getContext('2d');
+  
+          try {
+              var imageData = ctx.createImageData(width, height);
+              // Copy from C buffer to ImageData
+              var srcData = new Uint8Array(Module.HEAPU8.buffer, buffer, bufLen);
+              imageData.data.set(srcData);
+              ctx.putImageData(imageData, x, y);
+          } catch (e) {
+              console.error('js_put_image_data error:', e);
+          }
       }
 
   function _js_request_midi_access() {
@@ -5336,7 +5368,6 @@ missingLibrarySymbols.forEach(missingLibrarySymbol)
   'HEAPF32',
   'HEAPF64',
   'HEAP8',
-  'HEAPU8',
   'HEAP16',
   'HEAPU16',
   'HEAP32',
@@ -5754,6 +5785,8 @@ var wasmImports = {
   /** @export */
   js_get_canvas_width: _js_get_canvas_width,
   /** @export */
+  js_get_image_data: _js_get_image_data,
+  /** @export */
   js_get_midi_input_count: _js_get_midi_input_count,
   /** @export */
   js_get_midi_input_name: _js_get_midi_input_name,
@@ -5763,6 +5796,8 @@ var wasmImports = {
   js_get_midi_output_name: _js_get_midi_output_name,
   /** @export */
   js_open_midi_input: _js_open_midi_input,
+  /** @export */
+  js_put_image_data: _js_put_image_data,
   /** @export */
   js_request_midi_access: _js_request_midi_access,
   /** @export */
