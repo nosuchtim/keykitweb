@@ -612,6 +612,7 @@ function add2tooltypes(fn,ttypes) {
 }
 
 function mkmenu_tools(o,i) {
+	printf("mkmenu_tools o=",o," i=",i)
 	names = tooltypes(i)
 	nn = sizeof(names)
 	for ( n=0; n<nn; n++ ) {

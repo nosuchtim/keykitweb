@@ -184,18 +184,14 @@ keystr(char *s)
 {
 	Codep cp;
 
-	sprintf(Msg1,"TJT DEBUG in keystr s=%s\n",s);
+	sprintf(Msg1,"keystr s=(%s)\n",s);
 	mdep_popup(Msg1);
 
 	T = newtask(instructs(""));
-	mdep_popup("TJT DEBUG after newtask\n");
 	cp = instructs(s);
-	mdep_popup("TJT DEBUG after instructs\n");
 	if ( cp ) {
-		mdep_popup("TJT DEBUG calling nestinstruct\n");
 		nestinstruct(cp);
 	}
-	mdep_popup("TJT DEBUG after instructs\n");
 }
 
 /* defnonly(s) - warn if illegal definition */
@@ -1449,7 +1445,6 @@ scantill(char *lookfor,char *buff,char *pend)
 void
 readkeylibs(void)
 {
-	mdep_popup("TJT DEBUG readkeylibs\n");
 	if ( Keylibtable == NULL ) {
 		char *p = getenv("KEYLIBHASHSIZE");
 		Keylibtable = newht ( p ? atoi(p) : 251 );
@@ -1706,9 +1701,7 @@ MAIN(int argc,char **argv)
 	realConsolefd = Consolefd;
 	Consolefd = -1;
 
-	mdep_popup("TJT DEBUG before keystart()");
 	keystart();
-	mdep_popup("TJT DEBUG after keystart()");
 
 	if ((p = getenv("KEYPAGEPERSISTENT")) != NULL) {
 		*Keypagepersistent = uniqstr(p);
@@ -1808,16 +1801,12 @@ MAIN(int argc,char **argv)
 	/* probably has something to do with end-of-file, or something.    */
 	/* For startgraphics(), we restore the real Consolefd for linux.   */
 	Consolefd = realConsolefd;
-	mdep_popup("TJT DEBUG before startgraphics");
 	startgraphics();
 	Consolefd = -1;
 
-	mdep_popup("TJT DEBUG before startrealtime");
 	startrealtime();
-	mdep_popup("TJT DEBUG before startreboot");
 	startreboot();
 
-	mdep_popup("TJT DEBUG before initsyms2");
 	initsyms2();	/* for stuff that gets set in startgraphics, mainly */
 	if ( Errfileit )
 		*Loadverbose = 1;
@@ -1835,18 +1824,12 @@ MAIN(int argc,char **argv)
 			mdep_popup("TJT DEBUG starting interactive argc loop");
 			Consolefd = realConsolefd;
 			if ( do_rc ) {
-				mdep_popup("TJT DEBUG calling keyrc()");
 				keystr("keyrc();");
-				mdep_popup("TJT DEBUG after keyrc()");
 				do_rc = 0;
 			}
-			mdep_popup("TJT DEBUG before exectasks()");	
-			mdep_popup("TJT DEBUG DISABLED exectasks()");
 			exectasks(0);
-			mdep_popup("TJT DEBUG after exectasks()");	
 			Consolefd = -1;
 
-			mdep_popup("TJT DEBUG Setting AA go_interactive=0");
 			go_interactive = 0;
 			continue;
 		}
@@ -1889,9 +1872,6 @@ MAIN(int argc,char **argv)
 		keyfile(arg,FLAGERROR);
 		exectasks(0);
 	}
-	mdep_popup("TJT DEBUG before interactive");
-	sprintf(Msg1,"TJT DEBUG after argc loop go_interactive=%d do_rc=%d",go_interactive,do_rc);
-	mdep_popup(Msg1);
 	if ( go_interactive ) {
 		mdep_popup("INTERACTIVE!");
 		Consolefd = realConsolefd;
@@ -1901,7 +1881,7 @@ MAIN(int argc,char **argv)
 			keystr("keyrc();");
 		}
 		mdep_popup("TJT DEBUG before exectasks");
-		mdep_popup("TJT DEBUG DISABLED exectasks()");
+		mdep_popup("TJT DEBUG DISABLED exectasks() during development, should be re-enabled later");
 		// exectasks(0);
 		Consolefd = -1;
 	}

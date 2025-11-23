@@ -556,7 +556,6 @@ mdep_mdep(int argc)
 	int n;
 	Datum d;
 
-	mdep_popup("===== MDEP_MDEP !!!!!!!!!!!!!!!!!\n");
 	d = Nullval;
 	/*
 	 * Things past the first 3 args might be integers
@@ -584,12 +583,8 @@ mdep_mdep(int argc)
 		execerror("mdep(\"midi\",...) is no longer used.  Use midi(...).\n");
 	}
 	else if ( strcmp(args[0],"env") == 0 ) {
-		mdep_popup("===== mdep env !!!!  \n");
 	    if ( strcmp(args[1],"get")==0 ) {
-			mdep_popup("===== mdep env get\n");
 			char *s = getenv(args[2]);
-			sprintf(Msg2,"===== mdep env get got %s\n",s);
-			mdep_popup(Msg2);
 			if ( s != NULL ) {
 				d = strdatum(uniqstr(s));
 			} else {
