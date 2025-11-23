@@ -8,7 +8,7 @@ echo "[" > lib_manifest.json
 
 first=true
 shopt -s nullglob
-for file in *.k *.kc *.kb *.kbm *.exp *.txt *.ppm; do
+for file in *.k *.kc *.kb *.kbm *.exp *.txt *.ppm *.lst; do
     if [ -f "$file" ]; then
         if [ "$first" = true ]; then
             first=false

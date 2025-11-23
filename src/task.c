@@ -156,17 +156,13 @@ taskptr(long tid)
 		return(NULL);
 }
 
-/* jmp_buf Begin; */
+jmp_buf Begin;
 
 void
 restartexec(void)
 NO_RETURN_ATTRIBUTE
 {
-	/* longjmp(Begin,1); */
-	mdep_popup("TJT DEBUG restartexec does nothing, doing immediate and clean_exit!\n");
-	mdep_endmidi();
-	mdep_bye();
-	exit(0);
+	longjmp(Begin,1);
 	/*NOTREACHED*/
 }
 
@@ -592,12 +588,10 @@ exectasks(int nosetjmp)
 	// KeyPyState = PyEval_SaveThread();
 #endif
 
-	/* WASM does not use setjmp */
-	// if ( (!nosetjmp) ) {
-	// 	setjmp(Begin);
-	// }
+	if ( (!nosetjmp) ) {
+		setjmp(Begin);
+	}
 
-	// mdep_popup("TJT DEBUG entering exectasks");
 	setintcatch();
 
 	thcnt = ccnt = 0;

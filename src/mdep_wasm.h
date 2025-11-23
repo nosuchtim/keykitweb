@@ -15,6 +15,7 @@
 #include <errno.h>
 #include <string.h>
 #include <signal.h>
+#include <setjmp.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
