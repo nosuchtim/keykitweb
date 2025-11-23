@@ -59,6 +59,25 @@ static char current_color_rgb[32] = "rgb(0,0,0)";
 static int canvas_width = 1024;
 static int canvas_height = 768;
 
+static char *color_list[KEYNCOLORS] = {
+    "rgb(0,0,0)",       // Black
+    "rgb(255,255,255)", // White
+    "rgb(255,0,0)",     // Red
+    "rgb(0,255,255)",   // Cyan
+    "rgb(0,255,0)",     // Green
+    "rgb(255,0,255)",   // Magenta
+    "rgb(255,255,0)",   // Yellow
+    "rgb(0,0,255)",     // Blue
+    "rgb(128,128,128)", // Gray
+    "rgb(128,128,255)", // Light Blue
+    "rgb(128,255,128)", // Light Green
+    "rgb(128,255,255)", // Light Cyan
+    "rgb(255,128,128)", // Light Red
+    "rgb(255,128,255)", // Light Magenta
+    "rgb(255,255,128)", // Light Yellow
+    "rgb(192,192,192)"  // Light Gray
+};
+
 void
 mdep_hello(int argc, char **argv)
 {
@@ -595,134 +614,7 @@ mdep_mdep(int argc)
 	    }
 	}
 	else if ( strcmp(args[0],"video") == 0 ) {
-#if KEYCAPTURE
-	    if ( strcmp(args[1],"capture")==0 ) {
-		if ( strcmp(args[2],"stop") == 0 ) {
-			key_stop_capture();
-		} else if ( strcmp(args[2],"start") == 0 ) {
-			int gx;
-			int gy;
-			Datum d3 = ARG(3);
-			Datum d4 = ARG(4);
-
-			key_start_capture();
-			gx = roundval(d3);
-			gy = roundval(d4);
-			setvideogrid(gx,gy);
-		} else {
-			execerror("mdep(\"video\",\"capture\",...): %s not recognized\n",args[2]);
-		}
-
-	    } else if ( strcmp(args[1],"start")==0 ) {
-		int gx = 32;
-		int gy = 32;
-		if (!startvideo())
-			d = numdatum(0);
-		else
-			d = numdatum(1);
-
-	    } else if ( strcmp(args[1],"get")==0
-			&& *args[3] != 0 && *args[4] != 0 ) {
-
-			Datum d3 = ARG(3);
-			Datum d4 = ARG(4);
-			int gx = roundval(d3);
-			int gy = roundval(d4);
-			int v;
-			int offset = gy * GridXsize + gx;
-
-			args[2] = needstr("mdep",ARG(2));
-
-			if ( strcmp(args[2],"red")==0 )
-				v = GridRedAvg[offset];
-			else if ( strcmp(args[2],"green")==0 )
-				v = GridGreenAvg[offset];
-			else if ( strcmp(args[2],"blue")==0 )
-				v = GridBlueAvg[offset];
-			else if ( strcmp(args[2],"grey")==0 )
-				v = GridGreyAvg[offset];
-			else
-				execerror("mdep(\"video\",\"get\",...): %s is unrecognized\n",args[2]);
-			d = numdatum(v);
-
-	    } else if ( strcmp(args[1],"getaverage")==0 ) {
-
-			int gx, gy;
-			long redtot = 0;
-			long greentot = 0;
-			long bluetot = 0;
-			long greytot = 0;
-			int redavg, greenavg, blueavg, greyavg;
-			int nxy = GridXsize * GridYsize;
-
-			for ( gx=0; gx<GridXsize; gx++ ) {
-				for ( gy=0; gy<GridYsize; gy++ ) {
-					int offset = gy * GridXsize + gx;
-					int rv = GridRedAvgPrev[offset];
-					int gv = GridGreenAvgPrev[offset];
-					int bv = GridBlueAvgPrev[offset];
-					redtot += rv;
-					greentot += gv;
-					bluetot += bv;
-					greytot += (rv+gv+bv);
-				}
-			}
-			redavg = redtot / nxy;
-			greenavg = greentot / nxy;
-			blueavg = bluetot / nxy;
-			greyavg = greytot / nxy;
-
-			d = newarrdatum(0,3);
-			setarraydata(d.u.arr,
-				Str_red,numdatum(redavg));
-			setarraydata(d.u.arr,
-				Str_green,numdatum(greenavg));
-			setarraydata(d.u.arr,
-				Str_blue,numdatum(blueavg));
-			setarraydata(d.u.arr,
-				Str_grey,numdatum(greyavg));
-
-	    } else if ( strcmp(args[1],"getchange")==0
-			&& *args[3] != 0 && *args[4] != 0 ) {
-
-			Datum d3 = ARG(3);
-			Datum d4 = ARG(4);
-			int gx = roundval(d3);
-			int gy = roundval(d4);
-			int v;
-			int dv;
-			int offset = gy * GridXsize + gx;
-
-			args[2] = needstr("mdep",ARG(2));
-
-			if ( strcmp(args[2],"red")==0 ) {
-				v = GridRedAvg[offset];
-				dv = v - GridRedAvgPrev[offset];
-				GridRedAvgPrev[offset] = v;
-			} else if ( strcmp(args[2],"green")==0 ) {
-				v = GridGreenAvg[offset];
-				dv = v - GridGreenAvgPrev[offset];
-				GridGreenAvgPrev[offset] = v;
-			} else if ( strcmp(args[2],"blue")==0 ) {
-				v = GridBlueAvg[offset];
-				dv = v - GridBlueAvgPrev[offset];
-				GridBlueAvgPrev[offset] = v;
-			} else if ( strcmp(args[2],"grey")==0 ) {
-				v = GridGreyAvg[offset];
-				dv = v - GridGreyAvgPrev[offset];
-				GridGreyAvgPrev[offset] = v;
-			} else
-				execerror("mdep(\"video\",\"get\",...): %s is unrecognized\n",args[2]);
-			if ( dv == v )
-				dv = 0;
-			d = numdatum(dv);
-
-	    } else {
-		eprint("Error: unrecognized video argument - %s\n",args[1]);
-	    }
-#else
 	    execerror("mdep(\"video\",...): keykit not compiled with video support\n");
-#endif
 	}
 	else if ( strcmp(args[0],"gesture") == 0 ) {
 	    execerror("mdep(\"gesture\",...): keykit not compiled with igesture support\n");
@@ -1083,7 +975,7 @@ mdep_fontwidth(void)
 int
 mdep_fontheight(void)
 {
-    return js_get_font_height();
+    return js_get_font_height() + 4; // Add small padding
 }
 
 void
@@ -1099,44 +991,20 @@ mdep_string(int x, int y, char *s)
 		// printf(stderr,"TJT DEBUG mdep_string is calling js_draw_text at %d,%d: %s\n", x, y, s);
 		// mdep_popup(Msg1);
 		// printf("TJT DEBUG mdep_string s=%s\n",s);
-        js_draw_text(x, y + mdep_fontheight(), s);
+        js_draw_text(x, y + mdep_fontheight() - 2, s);
     }
 }
 
 // Color palette - KeyKit uses indexed colors
 // Map color indices to RGB values
-static void
-update_color_from_index(int c)
-{
-    current_color_index = c;
-
-    // Basic color palette (extend as needed)
-    switch (c % 16) {
-        case 0:  sprintf(current_color_rgb, "rgb(0,0,0)"); break;       // Black
-        case 1:  sprintf(current_color_rgb, "rgb(0,0,255)"); break;     // Blue
-        case 2:  sprintf(current_color_rgb, "rgb(0,255,0)"); break;     // Green
-        case 3:  sprintf(current_color_rgb, "rgb(0,255,255)"); break;   // Cyan
-        case 4:  sprintf(current_color_rgb, "rgb(255,0,0)"); break;     // Red
-        case 5:  sprintf(current_color_rgb, "rgb(255,0,255)"); break;   // Magenta
-        case 6:  sprintf(current_color_rgb, "rgb(255,255,0)"); break;   // Yellow
-        case 7:  sprintf(current_color_rgb, "rgb(255,255,255)"); break; // White
-        case 8:  sprintf(current_color_rgb, "rgb(128,128,128)"); break; // Gray
-        case 9:  sprintf(current_color_rgb, "rgb(128,128,255)"); break; // Light Blue
-        case 10: sprintf(current_color_rgb, "rgb(128,255,128)"); break; // Light Green
-        case 11: sprintf(current_color_rgb, "rgb(128,255,255)"); break; // Light Cyan
-        case 12: sprintf(current_color_rgb, "rgb(255,128,128)"); break; // Light Red
-        case 13: sprintf(current_color_rgb, "rgb(255,128,255)"); break; // Light Magenta
-        case 14: sprintf(current_color_rgb, "rgb(255,255,128)"); break; // Light Yellow
-        case 15: sprintf(current_color_rgb, "rgb(192,192,192)"); break; // Light Gray
-        default: sprintf(current_color_rgb, "rgb(0,0,0)"); break;
-    }
-}
-
 void
 mdep_color(int c)
 {
-    update_color_from_index(c);
-	printf("mdep_color setting color index %d -> %s\n", c, current_color_rgb);
+	c = c % KEYNCOLORS;
+	strcpy(current_color_rgb,color_list[c]);
+	printf("mdep_color c=%d current_color_rgb = %s\n", c, current_color_rgb);
+
+    current_color_index = c;
     js_set_color(current_color_rgb);
 }
 
@@ -1159,7 +1027,7 @@ mdep_boxfill(int x0, int y0, int x1, int y1)
     int y = (y0 < y1) ? y0 : y1;
     int w = abs(x1 - x0);
     int h = abs(y1 - y0);
-    printf("TJT DEBUG mdep_boxfill is calling js_fill_rect %d,%d,%d,%d\n", x, y, w, h   );
+    // printf("TJT DEBUG mdep_boxfill is calling js_fill_rect %d,%d,%d,%d\n", x, y, w, h   );
     js_fill_rect(x, y, w, h);
 }
 
@@ -1211,8 +1079,7 @@ mdep_startgraphics(int argc, char **argv)
     // Initialize graphics system
     printf("Initializing KeyKit graphics on Canvas...\n");
 
-    const char *colors[] = {"red", "green", "blue", "orange", "purple", "cyan", "magenta", "yellow", "lime", "pink"};
-    *Colors = sizeof(colors) / sizeof(colors[0]);
+    *Colors = KEYNCOLORS;
 
     // Request canvas dimensions
     canvas_width = js_get_canvas_width();
@@ -1230,7 +1097,7 @@ mdep_startgraphics(int argc, char **argv)
     js_set_font("16px monospace");
 
     // Set default color
-    mdep_color(7); // White
+    mdep_color(1); // White?
 
     // Use fallback dimensions if canvas returns 0
     if (canvas_width <= 0) canvas_width = 1024;
@@ -1329,17 +1196,36 @@ mdep_mousewarp(int x, int y)
     return -1;
 }
 
+#define MAX_COLOR_VALUE (256*256)
+
 // Color functions
 void
 mdep_colormix(int n, int r, int g, int b)
 {
-    // TODO: Set color palette entry
+	if ( n < 0 || n >= KEYNCOLORS ) {
+		execerror("mdep_colormix: color index %d out of range\n", n);
+	}
+    mdep_popup("TJT DEBUG colormix");
+	// The values in keykit are 0 to MAX_COLOR_VALUE
+	r = (r % MAX_COLOR_VALUE) / 256;
+	g = (g % MAX_COLOR_VALUE) / 256;
+	b = (b % MAX_COLOR_VALUE) / 256;
+	sprintf(current_color_rgb,"rgb(%d,%d,%d)", r, g, b);
+	mdep_popup(current_color_rgb);
+	color_list[n] = strdup(current_color_rgb);
+	printf("mdep_colormix n=%d current_color_rgb=%s\n", n, current_color_rgb);
+    js_set_color(current_color_rgb);
 }
 
 void
 mdep_initcolors(void)
 {
-    // TODO: Initialize color palette
+	// If not set explicitly, set all colors to white	
+	for ( int i=0; i<KEYNCOLORS; i++ ) {
+		if ( color_list[i] == NULL ) {
+			color_list[i] = strdup("rgb(255,255,255)");	
+		}	
+	}	
 }
 
 // Bitmap functions (Pbitmap is defined in grid.h)
