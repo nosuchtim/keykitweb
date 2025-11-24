@@ -2,6 +2,7 @@
 # mentioned in Keypath) need updating, and updates them.
 
 function updatelib(forceit,forcerekeylib,path,reread) {
+	print("updatelib called")
 	if ( nargs() < 1 )
 		forceit = 0
 	if ( nargs() < 2 )

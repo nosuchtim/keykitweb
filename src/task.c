@@ -315,6 +315,7 @@ handlewaitfor(int wn)
 		break;
 
 	case K_WINDRESIZE:
+		mdep_popup("TJT DEBUG handlewaitfor K_WINDRESIZE !!!!!!!!!!!!!!!!!\n");
 		t = MILLICLOCK;
 		dt = t-lastresize;
 		if ( dt<0 ) dt = -dt;
@@ -322,6 +323,7 @@ handlewaitfor(int wn)
 		if ( dt >= *Resizeignoretime )
 			lastresize = t;
 		if ( dt >= *Resizeignoretime ) {
+			mdep_popup("TJT DEBUG handlewaitfor calling Resizefunc !!!!!!!!!!!!!!!!!\n");
 			makesuredefined(&Resizefuncd,"Resizefunc");
 			taskfunc0(Resizefuncd->u.codep);
 		}

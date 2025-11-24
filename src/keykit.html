@@ -208,6 +208,9 @@
         // Flag to track if WASM runtime is fully initialized
         var wasmRuntimeReady = false;
 
+        // Debounce timer for resize events
+        var resizeDebounceTimer = null;
+
         // Function to initialize MIDI before main()
         function initMIDI() {
             console.log('[' + new Date().toISOString() + '] Initializing MIDI access...');
@@ -510,18 +513,37 @@
             var canvasWidth = containerWidth;
             var canvasHeight = Math.floor(containerWidth * 3 / 4);
 
-            canvas.width = canvasWidth;
-            canvas.height = canvasHeight;
-            console.log('[' + new Date().toISOString() + '] Canvas resized to ' + canvas.width + 'x' + canvas.height + ' (4:3 aspect ratio)');
+            // Only resize if dimensions actually changed (resizing clears the canvas)
+            var needsResize = (canvas.width !== canvasWidth || canvas.height !== canvasHeight);
 
-            // Notify C code of resize event (only if runtime is fully initialized)
-            if (wasmRuntimeReady && typeof Module !== 'undefined' && Module._mdep_on_window_resize) {
-                try {
-                    Module._mdep_on_window_resize(canvasWidth, canvasHeight);
-                } catch (e) {
-                    // Ignore errors if C code isn't ready yet
-                    console.log('Resize notification failed:', e);
+            if (needsResize) {
+                canvas.width = canvasWidth;
+                canvas.height = canvasHeight;
+                console.log('[RESIZE] Canvas dimensions changed to ' + canvas.width + 'x' + canvas.height);
+
+                // Debounce the notification to C code - wait 200ms after last resize
+                if (resizeDebounceTimer) {
+                    console.log('[RESIZE] Canceling previous debounce timer');
+                    clearTimeout(resizeDebounceTimer);
                 }
+
+                console.log('[RESIZE] Starting 200ms debounce timer');
+                resizeDebounceTimer = setTimeout(function() {
+                    console.log('[RESIZE] Debounce timer expired, notifying C code');
+                    // Notify C code of resize event (only if runtime is fully initialized)
+                    if (wasmRuntimeReady && typeof Module !== 'undefined' && Module._mdep_on_window_resize) {
+                        try {
+                            console.log('[RESIZE] Calling Module._mdep_on_window_resize(' + canvasWidth + ', ' + canvasHeight + ')');
+                            Module._mdep_on_window_resize(canvasWidth, canvasHeight);
+                            console.log('[RESIZE] Successfully notified C code');
+                        } catch (e) {
+                            console.error('[RESIZE] Error calling C callback:', e);
+                        }
+                    } else {
+                        console.warn('[RESIZE] Cannot notify C code - runtime not ready or function not available');
+                    }
+                    resizeDebounceTimer = null;
+                }, 200);
             }
         }
 
