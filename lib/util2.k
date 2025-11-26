@@ -379,10 +379,13 @@ function setdefaultchancolormap() {
 		15= ["r"=40000,"g"=20000,"b"=65535],
 		16= ["r"=65535,"g"=65535,"b"=40000]
 		]
-	for ( ch=1; ch<=16; ch++ ) {
-		colornum = ch + 16
-		colormix(colornum,colors[ch]["r"],colors[ch]["g"],colors[ch]["b"])
-		Chancolormap[ch] = colornum
+
+	print("SETDEFAULTCHANCOLORMAP hack")
+	colormix(8,65535,0,0)
+	for ( ch=1; ch<=1; ch++ ) {
+		# colornum = ch + 16 - 1
+		# colormix(colornum,colors[ch]["r"],colors[ch]["g"],colors[ch]["b"])
+		# Chancolormap[ch] = colornum
 	}
 }
 

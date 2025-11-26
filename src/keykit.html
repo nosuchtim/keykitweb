@@ -157,6 +157,13 @@
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
         }
     </style>
+
+    <!-- NATS.ws library for messaging (ES Module) -->
+    <script type="module">
+        import { connect, StringCodec } from 'https://cdn.jsdelivr.net/npm/nats.ws@1.30.3/esm/nats.js';
+        window.nats = { connect, StringCodec };
+        console.log('[NATS] Library loaded and exposed as window.nats');
+    </script>
 </head>
 <body>
     <div id="container">

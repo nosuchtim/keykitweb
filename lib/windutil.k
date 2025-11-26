@@ -16,6 +16,7 @@ function waitdown(f) {
 }
 
 function waitnsweep(o,type) {
+	print("function waitnsweep")
 	if ( nargs() < 2 ) {
 		print("usage: waitnsweep(obj,type)")
 		return()
@@ -25,6 +26,7 @@ function waitnsweep(o,type) {
 	m = waitdown(f)
 	s = o.sweep(f,type,m)
 	ungrabmousefifo(f)
+	print("waitnsweep return s=",s)
 	return(s)
 }
 
@@ -292,6 +294,7 @@ function wpastetool() {
 }
 function wmove(o,m,eraseit) {
 
+	print("function wmove called")
 	setmouse(CROSS)
 	f = grabmousefifo()
 
@@ -316,6 +319,7 @@ function wmove(o,m,eraseit) {
 	if ( nargs() < 3 || eraseit!=0 ) {
 		o.erase()
 	}
+	print("Initial XOR of Root.rectangle s=",s)
 	Root.rectangle(s,XOR)
 	while ( 1 ) {
 		m = get(f)
@@ -346,6 +350,7 @@ function wmove(o,m,eraseit) {
 		wmx = wmx2
 		wmy = wmy2
 	}
+	print("Final XOR of Root.rectangle s=",s)
 	Root.rectangle(s,XOR)
 	s = fit2root(s)
 	o.resize(s)
@@ -356,7 +361,9 @@ function wmove(o,m,eraseit) {
 }
 
 function sweeptool(toolfunc,...) {
+	print("Hi from sweeptool!")
 	sz = waitnsweep(Root,SWEEP)
+	print("after waitnsweep, sz=",sz)
 	if ( (sz["x1"]-sz["x0"]) < Toosmallx ) {
 		sz = fillspace(sz,[],"xy")
 		if ( (sz["x1"]-sz["x0"]) < Toosmallx )

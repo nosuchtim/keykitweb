@@ -1979,6 +1979,10 @@ bi_colormix(int argc)
 	r = (int) neednum(s,ARG(1));
 	g = (int) neednum(s,ARG(2));
 	b = (int) neednum(s,ARG(3));
+
+	// sprintf(Msg1,"HEYYYYYY bi_colormix (%d,%d,%d,%d) calling mdep_colormix",n,r,g,b);	
+	// mdep_popup(Msg1);
+
 	mdep_colormix(n,r,g,b);
 	ret(Nullval);
 }

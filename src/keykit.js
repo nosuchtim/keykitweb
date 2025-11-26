@@ -4588,6 +4588,141 @@ async function createWasm() {
           stringToUTF8(name, buffer, buffer_size);
       }
 
+  
+  function _js_nats_connect(urlPtr) {
+          var url = UTF8ToString(urlPtr);
+          console.log('[NATS] Attempting to connect to ' + url);
+  
+          // Check if NATS library is available
+          if (typeof nats === 'undefined') {
+              console.error('[NATS] NATS.ws library not loaded! Include nats.js in HTML.');
+              return -1;
+          }
+  
+          // Initialize StringCodec for encoding/decoding messages
+          if (!window.natsStringCodec) {
+              window.natsStringCodec = nats.StringCodec();
+          }
+          var sc = window.natsStringCodec;
+  
+          // Connect to NATS server
+          nats.connect({ servers: url })
+              .then(function(nc) {
+                  window.natsConnection = nc;
+                  console.log('[NATS] Connected to ' + url);
+  
+                  // Set up default subscription to 'keykit.>' (all keykit subjects)
+                  var sub = nc.subscribe('keykit.>', {
+                      callback: function(err, msg) {
+                          if (err) {
+                              console.error('[NATS] Subscription error:', err);
+                              return;
+                          }
+                          var data = sc.decode(msg.data);
+                          console.log('[NATS] Received message on "' + msg.subject + '": ' + data);
+  
+                          // Call C callback if available
+                          if (typeof Module !== 'undefined' && Module.ccall) {
+                              try {
+                                  Module.ccall('mdep_on_nats_message', null,
+                                               ['string', 'string'],
+                                               [msg.subject, data]);
+                                  console.log('[NATS] Successfully called C callback');
+                              } catch (e) {
+                                  console.error('[NATS] Error calling C callback:', e);
+                              }
+                          } else {
+                              console.warn('[NATS] Module not ready, message dropped');
+                          }
+                      }
+                  });
+  
+                  console.log('[NATS] Subscribed to keykit.* subjects');
+  
+                  // Handle connection closed
+                  nc.closed().then(function(err) {
+                      if (err) {
+                          console.error('[NATS] Connection closed with error:', err);
+                      } else {
+                          console.log('[NATS] Connection closed gracefully');
+                      }
+                      window.natsConnection = null;
+                  });
+              })
+              .catch(function(err) {
+                  console.error('[NATS] Connection failed:', err);
+                  window.natsConnection = null;
+              });
+  
+          return 0; // Initiated (async)
+      }
+
+  function _js_nats_is_connected() {
+          return (window.natsConnection && !window.natsConnection.isClosed()) ? 1 : 0;
+      }
+
+  
+  function _js_nats_publish(subjectPtr, dataPtr) {
+          if (!window.natsConnection) {
+              console.error('[NATS] Not connected - cannot publish');
+              return -1;
+          }
+  
+          var subject = UTF8ToString(subjectPtr);
+          var data = UTF8ToString(dataPtr);
+          var sc = window.natsStringCodec;
+  
+          try {
+              window.natsConnection.publish(subject, sc.encode(data));
+              console.log('[NATS] Published to "' + subject + '": ' + data);
+              return 0; // Success
+          } catch (e) {
+              console.error('[NATS] Publish error:', e);
+              return -1;
+          }
+      }
+
+  
+  function _js_nats_subscribe(subjectPtr) {
+          if (!window.natsConnection) {
+              console.error('[NATS] Not connected - cannot subscribe');
+              return -1;
+          }
+  
+          var subject = UTF8ToString(subjectPtr);
+          var sc = window.natsStringCodec;
+  
+          try {
+              var sub = window.natsConnection.subscribe(subject, {
+                  callback: function(err, msg) {
+                      if (err) {
+                          console.error('[NATS] Subscription error on "' + subject + '":', err);
+                          return;
+                      }
+                      var data = sc.decode(msg.data);
+                      console.log('[NATS] Received on "' + msg.subject + '": ' + data);
+  
+                      // Call C callback
+                      if (typeof Module !== 'undefined' && Module.ccall) {
+                          try {
+                              Module.ccall('mdep_on_nats_message', null,
+                                           ['string', 'string'],
+                                           [msg.subject, data]);
+                          } catch (e) {
+                              console.error('[NATS] Error calling C callback:', e);
+                          }
+                      }
+                  }
+              });
+  
+              console.log('[NATS] Subscribed to "' + subject + '"');
+              return 0; // Success
+          } catch (e) {
+              console.error('[NATS] Subscribe error:', e);
+              return -1;
+          }
+      }
+
   function _js_open_midi_input(index) {
           if (!window.midiInputs || index < 0 || index >= window.midiInputs.length) {
               console.error('Invalid MIDI input index: ' + index);
@@ -4824,6 +4959,165 @@ async function createWasm() {
           });
   
           console.log('Mouse event listeners set up successfully');
+      }
+
+  function _js_websocket_close(portId) {
+          if (!window.keykitWebSockets || !window.keykitWebSockets[portId]) {
+              return 0;
+          }
+  
+          try {
+              var wsInfo = window.keykitWebSockets[portId];
+              if (wsInfo.ws && wsInfo.ws.readyState !== WebSocket.CLOSED) {
+                  wsInfo.ws.close();
+              }
+              delete window.keykitWebSockets[portId];
+              console.log('[WebSocket] Closed port ' + portId);
+              return 0;
+          } catch (e) {
+              console.error('[WebSocket] Error closing port ' + portId + ':', e);
+              return -1;
+          }
+      }
+
+  
+  function _js_websocket_connect(urlPtr, portId) {
+          var url = UTF8ToString(urlPtr);
+          console.log('[WebSocket] Connecting to ' + url + ' for port ' + portId);
+  
+          try {
+              var ws = new WebSocket(url);
+  
+              // Store in global registry
+              if (!window.keykitWebSockets) {
+                  window.keykitWebSockets = {};
+              }
+              window.keykitWebSockets[portId] = {
+                  ws: ws,
+                  state: 'connecting',
+                  receiveBuffer: []
+              };
+  
+              ws.onopen = function() {
+                  console.log('[WebSocket] Connected: ' + url);
+                  window.keykitWebSockets[portId].state = 'connected';
+  
+                  // Notify C code
+                  if (typeof Module !== 'undefined' && Module.ccall) {
+                      try {
+                          Module.ccall('mdep_on_websocket_event', null,
+                                       ['number', 'string'],
+                                       [portId, 'open']);
+                      } catch (e) {
+                          console.error('[WebSocket] Error calling C callback:', e);
+                      }
+                  }
+              };
+  
+              ws.onmessage = function(event) {
+                  console.log('[WebSocket] Received data on port ' + portId + ': ' + event.data.length + ' bytes');
+  
+                  // Buffer the data
+                  window.keykitWebSockets[portId].receiveBuffer.push(event.data);
+  
+                  // Notify C code
+                  if (typeof Module !== 'undefined' && Module.ccall) {
+                      try {
+                          Module.ccall('mdep_on_websocket_event', null,
+                                       ['number', 'string'],
+                                       [portId, 'data']);
+                      } catch (e) {
+                          console.error('[WebSocket] Error calling C callback:', e);
+                      }
+                  }
+              };
+  
+              ws.onerror = function(error) {
+                  console.error('[WebSocket] Error on port ' + portId + ':', error);
+                  window.keykitWebSockets[portId].state = 'error';
+              };
+  
+              ws.onclose = function() {
+                  console.log('[WebSocket] Closed: port ' + portId);
+                  window.keykitWebSockets[portId].state = 'closed';
+  
+                  // Notify C code
+                  if (typeof Module !== 'undefined' && Module.ccall) {
+                      try {
+                          Module.ccall('mdep_on_websocket_event', null,
+                                       ['number', 'string'],
+                                       [portId, 'close']);
+                      } catch (e) {
+                          console.error('[WebSocket] Error calling C callback:', e);
+                      }
+                  }
+              };
+  
+              return 0; // Success (async)
+          } catch (e) {
+              console.error('[WebSocket] Connection failed:', e);
+              return -1;
+          }
+      }
+
+  function _js_websocket_receive(portId, bufferPtr, bufferSize) {
+          if (!window.keykitWebSockets || !window.keykitWebSockets[portId]) {
+              return 0; // No data
+          }
+  
+          var wsInfo = window.keykitWebSockets[portId];
+          if (wsInfo.receiveBuffer.length === 0) {
+              return 0; // No data
+          }
+  
+          // Get first buffered message
+          var data = wsInfo.receiveBuffer.shift();
+  
+          // Convert to bytes and copy to C buffer
+          var bytes;
+          if (typeof data === 'string') {
+              // Text data
+              var encoder = new TextEncoder();
+              bytes = encoder.encode(data);
+          } else if (data instanceof ArrayBuffer) {
+              bytes = new Uint8Array(data);
+          } else if (data instanceof Blob) {
+              // For Blob, we'd need async handling - for now, skip
+              console.warn('[WebSocket] Blob data not yet supported');
+              return 0;
+          } else {
+              bytes = new Uint8Array(data);
+          }
+  
+          var bytesToCopy = Math.min(bytes.length, bufferSize);
+          Module.HEAPU8.set(bytes.subarray(0, bytesToCopy), bufferPtr);
+  
+          console.log('[WebSocket] Received ' + bytesToCopy + ' bytes from port ' + portId);
+          return bytesToCopy;
+      }
+
+  function _js_websocket_send(portId, dataPtr, dataLen) {
+          if (!window.keykitWebSockets || !window.keykitWebSockets[portId]) {
+              console.error('[WebSocket] Port ' + portId + ' not found');
+              return -1;
+          }
+  
+          var wsInfo = window.keykitWebSockets[portId];
+          if (wsInfo.state !== 'connected') {
+              console.error('[WebSocket] Port ' + portId + ' not connected (state: ' + wsInfo.state + ')');
+              return -1;
+          }
+  
+          try {
+              // Convert C buffer to JavaScript string or binary
+              var data = new Uint8Array(Module.HEAPU8.buffer, dataPtr, dataLen);
+              wsInfo.ws.send(data);
+              console.log('[WebSocket] Sent ' + dataLen + ' bytes on port ' + portId);
+              return dataLen;
+          } catch (e) {
+              console.error('[WebSocket] Send error on port ' + portId + ':', e);
+              return -1;
+          }
       }
 
 
@@ -5730,6 +6024,8 @@ var _mdep_on_mouse_move = Module['_mdep_on_mouse_move'] = makeInvalidEarlyAccess
 var _mdep_on_mouse_button = Module['_mdep_on_mouse_button'] = makeInvalidEarlyAccess('_mdep_on_mouse_button');
 var _mdep_on_key_event = Module['_mdep_on_key_event'] = makeInvalidEarlyAccess('_mdep_on_key_event');
 var _mdep_on_window_resize = Module['_mdep_on_window_resize'] = makeInvalidEarlyAccess('_mdep_on_window_resize');
+var _mdep_on_nats_message = Module['_mdep_on_nats_message'] = makeInvalidEarlyAccess('_mdep_on_nats_message');
+var _mdep_on_websocket_event = Module['_mdep_on_websocket_event'] = makeInvalidEarlyAccess('_mdep_on_websocket_event');
 var _emscripten_stack_get_end = makeInvalidEarlyAccess('_emscripten_stack_get_end');
 var _emscripten_stack_get_base = makeInvalidEarlyAccess('_emscripten_stack_get_base');
 var _setThrew = makeInvalidEarlyAccess('_setThrew');
@@ -5768,6 +6064,8 @@ function assignWasmExports(wasmExports) {
   assert(typeof wasmExports['mdep_on_mouse_button'] != 'undefined', 'missing Wasm export: mdep_on_mouse_button');
   assert(typeof wasmExports['mdep_on_key_event'] != 'undefined', 'missing Wasm export: mdep_on_key_event');
   assert(typeof wasmExports['mdep_on_window_resize'] != 'undefined', 'missing Wasm export: mdep_on_window_resize');
+  assert(typeof wasmExports['mdep_on_nats_message'] != 'undefined', 'missing Wasm export: mdep_on_nats_message');
+  assert(typeof wasmExports['mdep_on_websocket_event'] != 'undefined', 'missing Wasm export: mdep_on_websocket_event');
   assert(typeof wasmExports['emscripten_stack_get_end'] != 'undefined', 'missing Wasm export: emscripten_stack_get_end');
   assert(typeof wasmExports['emscripten_stack_get_base'] != 'undefined', 'missing Wasm export: emscripten_stack_get_base');
   assert(typeof wasmExports['setThrew'] != 'undefined', 'missing Wasm export: setThrew');
@@ -5802,6 +6100,8 @@ function assignWasmExports(wasmExports) {
   _mdep_on_mouse_button = Module['_mdep_on_mouse_button'] = createExportWrapper('mdep_on_mouse_button', 4);
   _mdep_on_key_event = Module['_mdep_on_key_event'] = createExportWrapper('mdep_on_key_event', 5);
   _mdep_on_window_resize = Module['_mdep_on_window_resize'] = createExportWrapper('mdep_on_window_resize', 2);
+  _mdep_on_nats_message = Module['_mdep_on_nats_message'] = createExportWrapper('mdep_on_nats_message', 2);
+  _mdep_on_websocket_event = Module['_mdep_on_websocket_event'] = createExportWrapper('mdep_on_websocket_event', 2);
   _emscripten_stack_get_end = wasmExports['emscripten_stack_get_end'];
   _emscripten_stack_get_base = wasmExports['emscripten_stack_get_base'];
   _setThrew = createExportWrapper('setThrew', 2);
@@ -5922,6 +6222,14 @@ var wasmImports = {
   /** @export */
   js_get_midi_output_name: _js_get_midi_output_name,
   /** @export */
+  js_nats_connect: _js_nats_connect,
+  /** @export */
+  js_nats_is_connected: _js_nats_is_connected,
+  /** @export */
+  js_nats_publish: _js_nats_publish,
+  /** @export */
+  js_nats_subscribe: _js_nats_subscribe,
+  /** @export */
   js_open_midi_input: _js_open_midi_input,
   /** @export */
   js_put_image_data: _js_put_image_data,
@@ -5936,7 +6244,15 @@ var wasmImports = {
   /** @export */
   js_setup_keyboard_events: _js_setup_keyboard_events,
   /** @export */
-  js_setup_mouse_events: _js_setup_mouse_events
+  js_setup_mouse_events: _js_setup_mouse_events,
+  /** @export */
+  js_websocket_close: _js_websocket_close,
+  /** @export */
+  js_websocket_connect: _js_websocket_connect,
+  /** @export */
+  js_websocket_receive: _js_websocket_receive,
+  /** @export */
+  js_websocket_send: _js_websocket_send
 };
 
 function invoke_v(index) {

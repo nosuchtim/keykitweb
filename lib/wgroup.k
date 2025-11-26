@@ -409,6 +409,7 @@ method patchphrase (tn) {
 
 method notifyaud (co,v){
 	$.audition=["start"=v["x0"],"end"=v["x1"]]
+	print("notifyaud audition=",$.audition)
 }
 
 method notifypickh (co,v) { $.notifypicksweep(co,v,0,"") }

@@ -143,6 +143,93 @@ KeyKit library files (`lib/*.k` and related files) are loaded at runtime into Em
 
 See `RUNTIME_LIBRARY_LOADING.md` for complete details.
 
+## NATS Messaging Integration
+
+KeyKit includes **NATS.ws** integration for distributed messaging and collaboration. NATS enables real-time communication between KeyKit instances or external systems via WebSocket.
+
+### Architecture
+
+The NATS implementation follows the same async callback pattern as MIDI:
+
+1. **JavaScript Layer** ([src/keykit_library.js](src/keykit_library.js)):
+   - `js_nats_connect(url)` - Connect to NATS server via WebSocket
+   - `js_nats_publish(subject, data)` - Publish string message to subject
+   - `js_nats_subscribe(subject)` - Subscribe to additional subjects
+   - `js_nats_is_connected()` - Check connection status
+   - `js_nats_close()` - Close connection and cleanup
+   - Automatic subscription to `keykit.>` wildcard on connection
+   - Calls `mdep_on_nats_message(subject, data)` callback when messages arrive
+
+2. **C Interface** ([src/mdep_wasm.c](src/mdep_wasm.c)):
+   - `mdep_on_nats_message()` - Async callback, buffers messages (minimal to avoid ASYNCIFY issues)
+   - `mdep_nats_connect(url)` - Initiate connection to NATS server
+   - `mdep_nats_publish(subject, data)` - Send message
+   - `mdep_nats_subscribe(subject)` - Add subscription
+   - `mdep_nats_get_message(&subject, &data)` - Retrieve buffered message (call from main loop)
+   - `mdep_nats_has_messages()` - Check if messages available
+   - `mdep_nats_is_connected()` - Check connection
+   - `mdep_nats_close()` - Close and cleanup
+   - 10-message circular buffer for incoming messages
+
+3. **Build Configuration**:
+   - NATS.ws library loaded via CDN in [src/keykit_shell.html](src/keykit_shell.html)
+   - `mdep_on_nats_message` exported in [src/build_wasm.py](src/build_wasm.py)
+
+### Usage Example
+
+```c
+// Connect to local NATS server with WebSocket
+mdep_nats_connect("ws://localhost:8080");
+
+// Publish a message
+mdep_nats_publish("keykit.midi.note", "C4 velocity 100");
+
+// Subscribe to additional subjects (beyond default keykit.>)
+mdep_nats_subscribe("external.events");
+
+// In main event loop, check for incoming messages
+char *subject, *data;
+while (mdep_nats_get_message(&subject, &data)) {
+    printf("Received on %s: %s\n", subject, data);
+    // Process message...
+    free(subject);
+    free(data);
+}
+```
+
+### Server Setup
+
+Your NATS server must have WebSocket support enabled:
+
+```bash
+# Run NATS server with WebSocket
+nats-server --websocket_port 8080
+```
+
+Or configure in `nats-server.conf`:
+```
+websocket {
+  port: 8080
+  no_tls: true
+}
+```
+
+### Use Cases
+
+- **Distributed MIDI**: Route MIDI events between multiple KeyKit instances
+- **Collaboration**: Share musical phrases, patterns, or control data
+- **Remote Control**: Control KeyKit parameters from external applications
+- **Event Streaming**: Publish musical events to analytics or recording systems
+- **Synchronization**: Coordinate timing and state across distributed performances
+
+### Implementation Notes
+
+- Messages are buffered in C to avoid ASYNCIFY stack issues with async callbacks
+- Default subscription to `keykit.>` catches all KeyKit-related subjects
+- String-only messages via `StringCodec()` (binary support could be added)
+- Connection is asynchronous - check `mdep_nats_is_connected()` before publishing
+- Buffer holds 10 messages - older messages dropped if not consumed
+
 ## Current Status
 
 Implementation complete:
@@ -151,6 +238,7 @@ Implementation complete:
 - **MIDI**: ✓ Web MIDI API with async device enumeration
 - **Input**: ✓ Mouse and keyboard event handling
 - **File I/O**: ✓ Virtual filesystem with runtime library loading
+- **NATS Messaging**: ✓ NATS.ws integration for distributed messaging
 
 ## Testing the WebAssembly Build
 

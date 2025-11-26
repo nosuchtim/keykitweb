@@ -74,6 +74,10 @@ v_setxy(Kwind *w)
 void
 drawsweep(Kwind *w,int type,int x0,int y0,int x1,int y1)
 {
+
+	sprintf(Msg1,"drawsweep called, type=%d x0=%d y0=%d x1=%d y1=%d\n",type,x0,y0,x1,y1	);
+	mdep_popup(Msg1);
+
 	switch (type) {
 	case M_SWEEP:
 		rectnormi(&x0,&y0,&x1,&y1);

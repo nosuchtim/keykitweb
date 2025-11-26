@@ -52,30 +52,89 @@ extern int js_get_image_data(int x, int y, int width, int height, unsigned char 
 extern void js_put_image_data(unsigned char *buffer, int bufLen, int x, int y, int width, int height);
 extern void js_copy_bitmap_region(int fromx, int fromy, int width, int height, int tox, int toy);
 
+// WebSocket functions (for network ports)
+extern int js_websocket_connect(const char *url, int portId);
+extern int js_websocket_send(int portId, const char *data, int dataLen);
+extern int js_websocket_receive(int portId, char *buffer, int bufferSize);
+extern int js_websocket_state(int portId);
+extern int js_websocket_close(int portId);
+
 // Global state for graphics
 static int current_color_index = 0;
-static char current_color_rgb[32] = "rgb(0,0,0)";
 static int canvas_width = 1024;
 static int canvas_height = 768;
 
-static char *color_list[KEYNCOLORS] = {
-    "rgb(0,0,0)",       // Black
-    "rgb(255,255,255)", // White
-    "rgb(255,0,0)",     // Red
-    "rgb(0,255,255)",   // Cyan
-    "rgb(0,255,0)",     // Green
-    "rgb(255,0,255)",   // Magenta
-    "rgb(255,255,0)",   // Yellow
-    "rgb(0,0,255)",     // Blue
-    "rgb(128,128,128)", // Gray
-    "rgb(128,128,255)", // Light Blue
-    "rgb(128,255,128)", // Light Green
-    "rgb(128,255,255)", // Light Cyan
-    "rgb(255,128,128)", // Light Red
-    "rgb(255,128,255)", // Light Magenta
-    "rgb(255,255,128)", // Light Yellow
-    "rgb(192,192,192)"  // Light Gray
+// Fixed-size color buffers
+#define RGB_BUFFER_SIZE 32 
+static char color_list[KEYNCOLORS][RGB_BUFFER_SIZE];
+
+// ========== Port Definitions (needed early for mdep_getportdata) ==========
+
+// Port types
+#define MYPORT_TCPIP_READ 1
+#define MYPORT_TCPIP_WRITE 2
+#define MYPORT_TCPIP_LISTEN 3
+#define MYPORT_UDP_WRITE 6
+#define MYPORT_UDP_LISTEN 7
+#define MYPORT_OSC_WRITE 8
+#define MYPORT_OSC_LISTEN 9
+#define MYPORT_NATS_WRITE 10
+#define MYPORT_NATS_LISTEN 11
+
+// Port states
+#define SOCK_UNCONNECTED 0
+#define SOCK_CONNECTED 1
+#define SOCK_CLOSED 2
+#define SOCK_LISTENING 3
+#define SOCK_REFUSED 4
+
+#define PORT_NORMAL 0
+#define PORT_CANREAD 1
+
+#define TYPE_NONE 0
+#define TYPE_READ 1
+#define TYPE_WRITE 2
+#define TYPE_LISTEN 3
+
+// Port info structure
+struct myportinfo {
+    char *name;
+    int myport_type;
+    int rw;  // TYPE_READ, TYPE_WRITE, TYPE_LISTEN
+    int portId;  // WebSocket ID
+    int sockstate;
+    int portstate;
+    int isopen;
+    int closeme;
+    int hasreturnedfinaldata;
+    char *buff;  // buffered data
+    int buffsize;
+    char *nats_subject;  // NATS subject for NATS ports
+    struct myportinfo *next;
 };
+
+typedef struct myportinfo Myport;
+
+static Myport *Topport = NULL;
+static int next_port_id = 1;
+
+// NATS message buffer structure (forward declarations)
+#define NATS_MESSAGE_BUFFER_SIZE 20
+struct nats_msg_buffer {
+    char *subject;
+    char *data;
+};
+static struct nats_msg_buffer nats_message_buffer[NATS_MESSAGE_BUFFER_SIZE];
+static int nats_message_read_pos = 0;
+static int nats_message_write_pos = 0;
+static int nats_message_count = 0;
+
+// Forward declarations of helper functions
+static int nats_has_message_for_subject(const char *subject);
+static int nats_get_message_for_subject(const char *subject, char *buffer, int buffer_size);
+static Myport *newmyport(char *name);
+static void sockaway(Myport *m, char *buff, int size);
+static void sendsockedaway(Myport *mp);
 
 void
 mdep_hello(int argc, char **argv)
@@ -326,6 +385,23 @@ void mdep_on_midi_message(int device_index, int status, int data1, int data2)
     }
 }
 
+// The value of mouse_buttons from Javascript
+// is a bitmask of buttons with 3 bits:
+// 1=left, 2=middle, 4=right.
+// But the keykit code expects values of
+// just 0 (no button), 1 (left button) and 2 (right button).
+// This function converts the bitmask to that format.
+int mdep_mouse_convert(int buttons) {
+    if ( buttons > 0 ) {
+        if (buttons & 1) {
+            buttons = 1; // Left button
+        } else if (buttons > 0 ) {
+            buttons = 2; // Right button
+        }
+    }
+    return buttons;
+}
+
 // Callback from JavaScript for mouse movement
 EMSCRIPTEN_KEEPALIVE
 void mdep_on_mouse_move(int x, int y)
@@ -333,6 +409,12 @@ void mdep_on_mouse_move(int x, int y)
     // Update current mouse position
     current_mouse_x = x;
     current_mouse_y = y;
+
+    // if (current_mouse_buttons != 0) {
+    //     sprintf(Msg1,"TJT DEBUG mdep_on_mouse_move called, x=%d y=%d current_mouse_buttons=%d\n",
+    //         x,y,current_mouse_buttons);
+    //     mdep_popup(Msg1);
+    // }
 
     // Buffer the mouse move event
     if (mouse_buffer_count < MOUSE_BUFFER_SIZE) {
@@ -354,13 +436,17 @@ void mdep_on_mouse_button(int down, int x, int y, int buttons)
     // Update current mouse state
     current_mouse_x = x;
     current_mouse_y = y;
-    current_mouse_buttons = buttons;
+    current_mouse_buttons = mdep_mouse_convert(buttons);
+
+    // sprintf(Msg1,"TJT DEBUG mdep_on_mouse_button called, down=%d x=%d y=%d current_mouse_buttons=%d\n",
+    //     down, x,y,current_mouse_buttons);
+    // mdep_popup(Msg1);
 
     // Buffer the mouse button event
     if (mouse_buffer_count < MOUSE_BUFFER_SIZE) {
         mouse_buffer[mouse_buffer_write_pos].x = x;
         mouse_buffer[mouse_buffer_write_pos].y = y;
-        mouse_buffer[mouse_buffer_write_pos].buttons = buttons;
+        mouse_buffer[mouse_buffer_write_pos].buttons = current_mouse_buttons;
         mouse_buffer[mouse_buffer_write_pos].event_type = down ? 1 : 2; // 1 = button down, 2 = button up
         mouse_buffer_write_pos++;
         if (mouse_buffer_write_pos >= MOUSE_BUFFER_SIZE)
@@ -964,7 +1050,58 @@ mdep_waitfor(int millimsecs)
 int
 mdep_getportdata(PORTHANDLE *port, char *buff, int max, Datum *data)
 {
-    return -1; // No ports
+    Myport *m;
+    int r;
+
+    // Check all open ports for data
+    for (m = Topport; m != NULL; m = m->next) {
+        if (!m->isopen)
+            continue;
+
+        // Check for closed/refused connections that need to return final status
+        if (m->rw == TYPE_READ && m->sockstate == SOCK_CLOSED && m->hasreturnedfinaldata == 0) {
+            m->hasreturnedfinaldata = 1;
+            *port = m;
+            return 0;  // EOF
+        }
+
+        if (m->rw == TYPE_READ && m->sockstate == SOCK_REFUSED && m->hasreturnedfinaldata == 0) {
+            m->hasreturnedfinaldata = 1;
+            *port = m;
+            return -2;  // Connection refused
+        }
+
+        // Check for readable ports
+        if (m->portstate == PORT_CANREAD || m->rw == TYPE_LISTEN) {
+            // NATS listen ports
+            if (m->myport_type == MYPORT_NATS_LISTEN) {
+                // Check for messages on this subject
+                if (nats_has_message_for_subject(m->nats_subject)) {
+                    r = nats_get_message_for_subject(m->nats_subject, buff, max);
+                    if (r > 0) {
+                        *port = m;
+                        printf("[PORT] mdep_getportdata: NATS port got %d bytes\n", r);
+                        return r;
+                    }
+                }
+                continue;
+            }
+
+            // WebSocket ports
+            if (m->portId > 0) {
+                r = js_websocket_receive(m->portId, buff, max);
+                if (r > 0) {
+                    *port = m;
+                    m->portstate = PORT_NORMAL;  // Clear can-read flag
+                    printf("[PORT] mdep_getportdata: WebSocket port %d got %d bytes\n",
+                           m->portId, r);
+                    return r;
+                }
+            }
+        }
+    }
+
+    return -1;  // No data available
 }
 
 int
@@ -1059,12 +1196,12 @@ void
 mdep_color(int c)
 {
 	c = c % KEYNCOLORS;
-	strcpy(current_color_rgb,color_list[c]);
-
-	// printf("mdep_color c=%d current_color_rgb = %s\n", c, current_color_rgb);
-
     current_color_index = c;
-    js_set_color(current_color_rgb);
+
+	// sprintf(Msg1,"mdep_color c=%d color_list[c] = %s\n", c, color_list[c]);
+    // mdep_popup(Msg1);   
+
+    js_set_color(color_list[c]);
 }
 
 void
@@ -1075,6 +1212,11 @@ mdep_box(int x0, int y0, int x1, int y1)
     int y = (y0 < y1) ? y0 : y1;
     int w = abs(x1 - x0);
     int h = abs(y1 - y0);
+
+    // sprintf(Msg1,"TJT DEBUG mdep_box is calling js_draw_rect %d,%d,%d,%d  color_index=%d  rgb=%s\n",
+    //     x, y, w, h, current_color_index, color_list[current_color_index]);
+    // mdep_popup(Msg1);   
+
     js_draw_rect(x, y, w, h);
 }
 
@@ -1086,7 +1228,11 @@ mdep_boxfill(int x0, int y0, int x1, int y1)
     int y = (y0 < y1) ? y0 : y1;
     int w = abs(x1 - x0);
     int h = abs(y1 - y0);
-    // printf("TJT DEBUG mdep_boxfill is calling js_fill_rect %d,%d,%d,%d\n", x, y, w, h   );
+
+    // sprintf(Msg1,"TJT DEBUG mdep_boxfill is calling js_draw_rect %d,%d,%d,%d  color_index=%d  color_rgb=%s\n",
+    //     x, y, w, h, current_color_index, color_list[current_color_index]);
+    // mdep_popup(Msg1);   
+
     js_fill_rect(x, y, w, h);
 }
 
@@ -1139,6 +1285,8 @@ mdep_startgraphics(int argc, char **argv)
     printf("Initializing KeyKit graphics on Canvas...\n");
 
     *Colors = KEYNCOLORS;
+	mdep_initcolors();
+    mdep_color(1); // White?
 
     // Request canvas dimensions
     canvas_width = js_get_canvas_width();
@@ -1149,7 +1297,6 @@ mdep_startgraphics(int argc, char **argv)
     js_setup_keyboard_events();
 
     // Clear canvas
-    mdep_popup("mdep_startgraphics is clearing canvas");    
     js_clear_canvas();
 
     // Set default font
@@ -1192,7 +1339,6 @@ void
 mdep_startreboot(void)
 {
     // Handle reboot - just clear the screen
-    mdep_popup("mdep_startreboot is clearing canvas\n");    
     js_clear_canvas();
 }
 
@@ -1200,7 +1346,6 @@ void
 mdep_endgraphics(void)
 {
     // Cleanup graphics
-    printf("Ending graphics...\n");
 }
 
 void
@@ -1209,9 +1354,16 @@ mdep_plotmode(int mode)
     // Set plot mode (for XOR drawing, etc.)
     // Canvas composite operations:
     // mode 0 = normal, mode 1 = XOR
-    if (mode == 1) {
-        js_set_composite_operation("xor");
+    // sprintf(Msg1,"SETTING PLOTMODE TO %d  !!!!!",mode);
+    // mdep_popup(Msg1);
+    if (mode == 2) {
+        mdep_popup("mdep_plotmode: mode == 2!!!!!!!!!!!!!!!!!");
+        js_set_composite_operation("difference");
+    } else if (mode == 1) {
+        // mdep_popup("mdep_plotmode: mode == 1!!!!!!!!!!!!!!!!!");
+        js_set_composite_operation("difference");
     } else {
+        // mdep_popup("mdep_plotmode: mode == 0!!!!!!!!!!!!!!!!!");
         js_set_composite_operation("source-over");
     }
 }
@@ -1252,17 +1404,6 @@ mdep_fontinit(char *fnt)
     return "monospace";
 }
 
-// Mouse functions
-int
-mdep_mouse(int *ax, int *ay, int *am)
-{
-    // Return current mouse state (updated by callbacks)
-    *ax = current_mouse_x;
-    *ay = current_mouse_y;
-    *am = current_mouse_buttons;
-    return 0;
-}
-
 int
 mdep_mousewarp(int x, int y)
 {
@@ -1274,32 +1415,49 @@ mdep_mousewarp(int x, int y)
 
 // Color functions
 void
-mdep_colormix(int n, int r, int g, int b)
+mdep_colormix(int c, int r, int g, int b)
 {
-	if ( n < 0 || n >= KEYNCOLORS ) {
-		execerror("mdep_colormix: color index %d out of range\n", n);
+	if ( c < 0 || c >= KEYNCOLORS ) {
+		execerror("mdep_colormix: color index %d out of range\n", c);
 	}
-    // mdep_popup("TJT DEBUG colormix");
 	// The values in keykit are 0 to MAX_COLOR_VALUE
 	r = (r % MAX_COLOR_VALUE) / 256;
 	g = (g % MAX_COLOR_VALUE) / 256;
 	b = (b % MAX_COLOR_VALUE) / 256;
-	sprintf(current_color_rgb,"rgb(%d,%d,%d)", r, g, b);
-	// mdep_popup(current_color_rgb);
-	color_list[n] = strdup(current_color_rgb);
-	// printf("mdep_colormix n=%d current_color_rgb=%s\n", n, current_color_rgb);
-    js_set_color(current_color_rgb);
+
+	sprintf(color_list[c],"rgb(%d,%d,%d)", r, g, b);
+
+	// sprintf(Msg1,"mdep_colormix c=%d rgb=%s\n", c, color_list[c]);
+    // mdep_popup(Msg1);   
+
+    // DON'T set the color right now, just update the color list
+    // js_set_color(color_list[c]);
 }
 
 void
 mdep_initcolors(void)
 {
-	// If not set explicitly, set all colors to white	
-	for ( int i=0; i<KEYNCOLORS; i++ ) {
-		if ( color_list[i] == NULL ) {
-			color_list[i] = strdup("rgb(255,255,255)");	
-		}	
-	}	
+	strcpy(color_list[0], "rgb(0,0,0)");       // Black
+	strcpy(color_list[1], "rgb(255,255,255)"); // White
+	strcpy(color_list[2], "rgb(255,0,0)");     // Red
+	strcpy(color_list[3], "rgb(0,255,255)");   // Cyan
+	strcpy(color_list[4], "rgb(0,255,0)");     // Green
+	strcpy(color_list[5], "rgb(255,0,255)");   // Magenta
+	strcpy(color_list[6], "rgb(255,255,0)");   // Yellow
+	strcpy(color_list[7], "rgb(0,0,255)");     // Blue
+	strcpy(color_list[8], "rgb(128,128,128)"); // Gray
+	strcpy(color_list[9], "rgb(128,128,255)"); // Light Blue
+	strcpy(color_list[10], "rgb(128,255,128)"); // Light Green
+	strcpy(color_list[11], "rgb(128,255,255)"); // Light Cyan
+	strcpy(color_list[12], "rgb(255,128,128)"); // Light Red
+	strcpy(color_list[13], "rgb(255,128,255)"); // Light Magenta
+	strcpy(color_list[14], "rgb(255,255,128)"); // Light Yellow
+	strcpy(color_list[15], "rgb(192,192,192)"); // Light Gray
+    for ( int i=16; i<KEYNCOLORS; i++ ) {
+        sprintf(color_list[i],"rgb(255,255,255)");
+    }
+
+    current_color_index = 1;
 }
 
 // Bitmap functions (Pbitmap is defined in grid.h)
@@ -1308,6 +1466,9 @@ mdep_allocbitmap(int xsize, int ysize)
 {
     Pbitmap pb = (Pbitmap)malloc(sizeof(struct Pbitmap_struct));
     if (pb) {
+        // sprintf(Msg1,"TJT DEBUG mdep_allocbitmap to size (%d,%d)\n",
+        //     xsize, ysize);
+        // mdep_popup(Msg1);
         pb->xsize = xsize;
         pb->ysize = ysize;
         pb->origx = xsize;
@@ -1446,19 +1607,344 @@ mdep_browse(char *desc, char *types, int mustexist)
 PORTHANDLE *
 mdep_openport(char *name, char *mode, char *type)
 {
+    static PORTHANDLE handle[2];
+    Myport *m0, *m1;
+    char buff[1024];
+    char *p;
+    char url[1024];
+
+    name = uniqstr(name);
+    printf("[PORT] mdep_openport: name='%s' mode='%s' type='%s'\n", name, mode, type);
+
+    // Parse name format: "port@host" or "port@host:portnum"
+    strcpy(buff, name);
+    p = strchr(buff, '@');
+    if (p == NULL) {
+        eprint("Port name must contain a '@' separating port@host!");
+        return NULL;
+    }
+    *p++ = 0;  // buff now has port name, p points to host
+
+    // tcpip_connect - bidirectional WebSocket connection
+    if (strcmp(type, "tcpip_connect") == 0) {
+        // Format WebSocket URL: ws://host:port/
+        snprintf(url, sizeof(url), "ws://%s", p);
+        printf("[PORT] tcpip_connect to %s\n", url);
+
+        m0 = newmyport(name);
+        m0->rw = TYPE_READ;
+        m0->myport_type = MYPORT_TCPIP_READ;
+        m0->isopen = 1;
+        m0->closeme = 1;
+
+        m1 = newmyport(name);
+        m1->rw = TYPE_WRITE;
+        m1->myport_type = MYPORT_TCPIP_WRITE;
+        m1->isopen = 1;
+        m1->portId = m0->portId;  // Share same WebSocket
+
+        // Initiate connection
+        if (js_websocket_connect(url, m0->portId) != 0) {
+            eprint("tcpip_connect to %s failed", url);
+            return NULL;
+        }
+
+        handle[0] = m0;
+        handle[1] = m1;
+        return handle;
+    }
+
+    // tcpip_listen - WebSocket server (note: browsers can't create servers,
+    // so this would require a WebSocket relay server)
+    if (strcmp(type, "tcpip_listen") == 0) {
+        printf("[PORT] tcpip_listen not fully supported in browser (would need relay server)\n");
+        // For now, return stub that indicates listen mode
+        m0 = newmyport(name);
+        m0->rw = TYPE_LISTEN;
+        m0->myport_type = MYPORT_TCPIP_LISTEN;
+        m0->isopen = 1;
+        m0->closeme = 1;
+        m0->sockstate = SOCK_LISTENING;
+        handle[0] = m0;
+        handle[1] = NULL;
+        return handle;
+    }
+
+    // udp_send - WebSocket for UDP simulation
+    if (strcmp(type, "udp_send") == 0) {
+        snprintf(url, sizeof(url), "ws://%s", p);
+        printf("[PORT] udp_send to %s\n", url);
+
+        m1 = newmyport(name);
+        m1->rw = TYPE_WRITE;
+        m1->myport_type = MYPORT_UDP_WRITE;
+        m1->isopen = 1;
+        m1->closeme = 1;
+
+        if (js_websocket_connect(url, m1->portId) != 0) {
+            eprint("udp_send to %s failed", url);
+            return NULL;
+        }
+
+        handle[0] = NULL;
+        handle[1] = m1;
+        return handle;
+    }
+
+    // udp_listen - WebSocket for UDP reception
+    if (strcmp(type, "udp_listen") == 0) {
+        snprintf(url, sizeof(url), "ws://%s", p);
+        printf("[PORT] udp_listen on %s\n", url);
+
+        m0 = newmyport(name);
+        m0->rw = TYPE_LISTEN;
+        m0->myport_type = MYPORT_UDP_LISTEN;
+        m0->isopen = 1;
+        m0->closeme = 1;
+
+        if (js_websocket_connect(url, m0->portId) != 0) {
+            eprint("udp_listen to %s failed", url);
+            return NULL;
+        }
+
+        m0->sockstate = SOCK_LISTENING;
+        handle[0] = m0;
+        handle[1] = NULL;
+        return handle;
+    }
+
+    // osc_send - OSC over WebSocket
+    if (strcmp(type, "osc_send") == 0) {
+        snprintf(url, sizeof(url), "ws://%s", p);
+        printf("[PORT] osc_send to %s\n", url);
+
+        m1 = newmyport(name);
+        m1->rw = TYPE_WRITE;
+        m1->myport_type = MYPORT_OSC_WRITE;
+        m1->isopen = 1;
+        m1->closeme = 1;
+
+        if (js_websocket_connect(url, m1->portId) != 0) {
+            eprint("osc_send to %s failed", url);
+            return NULL;
+        }
+
+        handle[0] = NULL;
+        handle[1] = m1;
+        return handle;
+    }
+
+    // osc_listen - OSC reception over WebSocket
+    if (strcmp(type, "osc_listen") == 0) {
+        snprintf(url, sizeof(url), "ws://%s", p);
+        printf("[PORT] osc_listen on %s\n", url);
+
+        m0 = newmyport(name);
+        m0->rw = TYPE_LISTEN;
+        m0->myport_type = MYPORT_OSC_LISTEN;
+        m0->isopen = 1;
+        m0->closeme = 1;
+
+        if (js_websocket_connect(url, m0->portId) != 0) {
+            eprint("osc_listen to %s failed", url);
+            return NULL;
+        }
+
+        m0->sockstate = SOCK_LISTENING;
+        handle[0] = m0;
+        handle[1] = NULL;
+        return handle;
+    }
+
+    // nats_send - NATS publish
+    // Format: "subject@nats://server:port"
+    if (strcmp(type, "nats_send") == 0) {
+        // buff contains subject, p contains server URL
+        printf("[PORT] nats_send subject='%s' server='%s'\n", buff, p);
+
+        // Connect to NATS server if not already connected
+        if (!js_nats_is_connected()) {
+            snprintf(url, sizeof(url), "ws://%s", p);
+            if (js_nats_connect(url) != 0) {
+                eprint("NATS connection to %s failed", url);
+                return NULL;
+            }
+            // Connection is async, will complete later
+        }
+
+        m1 = newmyport(name);
+        m1->rw = TYPE_WRITE;
+        m1->myport_type = MYPORT_NATS_WRITE;
+        m1->isopen = 1;
+        m1->closeme = 1;
+        m1->nats_subject = uniqstr(buff);  // Store subject
+        m1->sockstate = SOCK_CONNECTED;  // NATS handles connection state
+
+        handle[0] = NULL;
+        handle[1] = m1;
+        return handle;
+    }
+
+    // nats_listen - NATS subscribe
+    // Format: "subject@nats://server:port"
+    if (strcmp(type, "nats_listen") == 0) {
+        printf("[PORT] nats_listen subject='%s' server='%s'\n", buff, p);
+
+        // Connect to NATS server if not already connected
+        if (!js_nats_is_connected()) {
+            snprintf(url, sizeof(url), "ws://%s", p);
+            if (js_nats_connect(url) != 0) {
+                eprint("NATS connection to %s failed", url);
+                return NULL;
+            }
+        }
+
+        // Subscribe to the subject
+        if (js_nats_subscribe(buff) != 0) {
+            eprint("NATS subscribe to %s failed", buff);
+            return NULL;
+        }
+
+        m0 = newmyport(name);
+        m0->rw = TYPE_LISTEN;
+        m0->myport_type = MYPORT_NATS_LISTEN;
+        m0->isopen = 1;
+        m0->closeme = 1;
+        m0->nats_subject = uniqstr(buff);  // Store subject
+        m0->sockstate = SOCK_LISTENING;
+
+        handle[0] = m0;
+        handle[1] = NULL;
+        return handle;
+    }
+
+    eprint("Unknown port type - %s", type);
     return NULL;
 }
 
 int
 mdep_putportdata(PORTHANDLE m, char *buff, int size)
 {
-    return -1;
+    Myport *mp = (Myport *)m;
+    int r;
+
+    printf("[PORT] mdep_putportdata: portId=%d size=%d sockstate=%d type=%d\n",
+           mp->portId, size, mp->sockstate, mp->myport_type);
+
+    switch (mp->myport_type) {
+    case MYPORT_NATS_WRITE:
+        // NATS publish - need to convert binary to string
+        {
+            char *data_str = (char *)malloc(size + 1);
+            if (data_str) {
+                memcpy(data_str, buff, size);
+                data_str[size] = '\0';
+
+                printf("[PORT] NATS publish to subject '%s': %s\n",
+                       mp->nats_subject, data_str);
+
+                r = js_nats_publish(mp->nats_subject, data_str);
+                free(data_str);
+
+                if (r == 0) {
+                    r = size;  // Success - return bytes "sent"
+                }
+            } else {
+                r = -1;
+            }
+        }
+        break;
+
+    case MYPORT_OSC_WRITE:
+    case MYPORT_UDP_WRITE:
+        // Direct send for UDP-like protocols
+        r = js_websocket_send(mp->portId, buff, size);
+        break;
+
+    default:
+        // TCP-like protocols - buffer if not connected
+        switch (mp->sockstate) {
+        case SOCK_UNCONNECTED:
+            // Buffer for delivery when it connects
+            sockaway(mp, buff, size);
+            r = size;
+            break;
+
+        case SOCK_CLOSED:
+        case SOCK_REFUSED:
+            r = 0;  // Can't send
+            break;
+
+        default:
+            // Connected - send directly
+            r = js_websocket_send(mp->portId, buff, size);
+            if (r < 0) {
+                // Send failed, buffer it
+                sockaway(mp, buff, size);
+                r = 0;
+            }
+            break;
+        }
+        break;
+    }
+
+    return r;
 }
 
 int
 mdep_closeport(PORTHANDLE m)
 {
-    return -1;
+    Myport *mp = (Myport *)m;
+    Myport *prevmp, *currmp;
+    int r = 0;
+
+    printf("[PORT] mdep_closeport: portId=%d type=%d\n", mp->portId, mp->myport_type);
+
+    mp->isopen = 0;
+
+    // Close connection based on type
+    switch (mp->myport_type) {
+    case MYPORT_NATS_WRITE:
+    case MYPORT_NATS_LISTEN:
+        // NATS ports share connection - don't close unless no other NATS ports
+        // For now, just mark as closed (NATS connection managed globally)
+        printf("[PORT] NATS port closed (connection remains active)\n");
+        break;
+
+    case MYPORT_TCPIP_READ:
+    case MYPORT_TCPIP_WRITE:
+    case MYPORT_TCPIP_LISTEN:
+    case MYPORT_UDP_WRITE:
+    case MYPORT_UDP_LISTEN:
+    case MYPORT_OSC_WRITE:
+    case MYPORT_OSC_LISTEN:
+        if (mp->closeme) {
+            r = js_websocket_close(mp->portId);
+        }
+        break;
+    default:
+        break;
+    }
+
+    // Remove from Topport list
+    for (prevmp = NULL, currmp = Topport; currmp != NULL; prevmp = currmp, currmp = currmp->next) {
+        if (currmp == mp)
+            break;
+    }
+    if (prevmp == NULL)
+        Topport = mp->next;
+    else
+        prevmp->next = mp->next;
+
+    // Free buffered data
+    if (mp->buff)
+        free(mp->buff);
+
+    // Free NATS subject if present
+    // Note: uniqstr strings are shared/interned, so don't free them
+
+    free(mp);
+    return r;
 }
 
 Datum
@@ -1466,7 +1952,11 @@ mdep_ctlport(PORTHANDLE m, char *cmd, char *arg)
 {
     Datum d;
     d.type = D_NUM;
-    d.u.val = -1;
+    d.u.val = 0;
+
+    // No special control commands for WebSocket ports yet
+    // Could add things like setting binary mode, buffering options, etc.
+
     return d;
 }
 
@@ -1480,4 +1970,212 @@ char *
 mdep_localaddresses(Datum d)
 {
     return "127.0.0.1";
+}
+
+// ========== NATS Messaging Implementation ==========
+
+// NATS callback - called from JavaScript when message arrives
+// Keep this minimal to avoid ASYNCIFY issues
+EMSCRIPTEN_KEEPALIVE
+void mdep_on_nats_message(const char *subject, const char *data)
+{
+    // Simply buffer the message for later processing
+    if (nats_message_count < NATS_MESSAGE_BUFFER_SIZE) {
+        // Allocate and copy subject
+        int subject_len = strlen(subject);
+        nats_message_buffer[nats_message_write_pos].subject = (char *)malloc(subject_len + 1);
+        if (nats_message_buffer[nats_message_write_pos].subject) {
+            strcpy(nats_message_buffer[nats_message_write_pos].subject, subject);
+        }
+
+        // Allocate and copy data
+        int data_len = strlen(data);
+        nats_message_buffer[nats_message_write_pos].data = (char *)malloc(data_len + 1);
+        if (nats_message_buffer[nats_message_write_pos].data) {
+            strcpy(nats_message_buffer[nats_message_write_pos].data, data);
+        }
+
+        nats_message_write_pos = (nats_message_write_pos + 1) % NATS_MESSAGE_BUFFER_SIZE;
+        nats_message_count++;
+
+        printf("[NATS C] Buffered message: subject='%s' data='%s' (buffer count=%d)\n",
+               subject, data, nats_message_count);
+    } else {
+        printf("[NATS C] WARNING: Message buffer full, dropping message on '%s'\n", subject);
+    }
+}
+
+// Check if NATS messages are available for a specific subject
+static int nats_has_message_for_subject(const char *subject)
+{
+    if (nats_message_count == 0) {
+        return 0;
+    }
+
+    // Check if any buffered message matches the subject
+    int pos = nats_message_read_pos;
+    int checked = 0;
+    while (checked < nats_message_count) {
+        struct nats_msg_buffer *msg = &nats_message_buffer[pos];
+        if (msg->subject && strcmp(msg->subject, subject) == 0) {
+            return 1;
+        }
+        pos = (pos + 1) % NATS_MESSAGE_BUFFER_SIZE;
+        checked++;
+    }
+
+    return 0;
+}
+
+// Get next NATS message for a specific subject
+static int nats_get_message_for_subject(const char *subject, char *buffer, int buffer_size)
+{
+    if (nats_message_count == 0) {
+        return 0;
+    }
+
+    // Find first message matching subject
+    int pos = nats_message_read_pos;
+    int checked = 0;
+    int found_at = -1;
+
+    while (checked < nats_message_count) {
+        struct nats_msg_buffer *msg = &nats_message_buffer[pos];
+        if (msg->subject && strcmp(msg->subject, subject) == 0) {
+            found_at = pos;
+            break;
+        }
+        pos = (pos + 1) % NATS_MESSAGE_BUFFER_SIZE;
+        checked++;
+    }
+
+    if (found_at < 0) {
+        return 0;  // No matching message
+    }
+
+    // Copy message data to buffer
+    struct nats_msg_buffer *msg = &nats_message_buffer[found_at];
+    int data_len = strlen(msg->data);
+    int copy_len = (data_len < buffer_size - 1) ? data_len : (buffer_size - 1);
+    memcpy(buffer, msg->data, copy_len);
+    buffer[copy_len] = '\0';
+
+    // Free the message
+    free(msg->subject);
+    free(msg->data);
+    msg->subject = NULL;
+    msg->data = NULL;
+
+    // Compact buffer by moving later messages forward if needed
+    if (found_at == nats_message_read_pos) {
+        // Message at front - just advance read position
+        nats_message_read_pos = (nats_message_read_pos + 1) % NATS_MESSAGE_BUFFER_SIZE;
+    } else {
+        // Message in middle - shift remaining messages
+        int curr = found_at;
+        while (curr != nats_message_write_pos) {
+            int next = (curr + 1) % NATS_MESSAGE_BUFFER_SIZE;
+            nats_message_buffer[curr] = nats_message_buffer[next];
+            curr = next;
+        }
+        // Adjust write position
+        nats_message_write_pos = (nats_message_write_pos - 1 + NATS_MESSAGE_BUFFER_SIZE) % NATS_MESSAGE_BUFFER_SIZE;
+    }
+
+    nats_message_count--;
+
+    printf("[NATS C] Retrieved message from buffer for subject '%s' (remaining: %d)\n",
+           subject, nats_message_count);
+
+    return copy_len;
+}
+
+// ========== Network Port Implementation (WebSocket-based) ==========
+
+// Create new port
+static Myport *newmyport(char *name)
+{
+    Myport *m = (Myport *)malloc(sizeof(Myport));
+    if (!m) return NULL;
+
+    m->name = uniqstr(name);
+    m->portId = next_port_id++;
+    m->rw = TYPE_NONE;
+    m->myport_type = 0;
+    m->sockstate = SOCK_UNCONNECTED;
+    m->portstate = PORT_NORMAL;
+    m->isopen = 0;
+    m->closeme = 0;
+    m->hasreturnedfinaldata = 0;
+    m->buff = NULL;
+    m->buffsize = 0;
+    m->nats_subject = NULL;
+
+    // Add to list
+    m->next = Topport;
+    Topport = m;
+
+    return m;
+}
+
+// Buffer data when socket not ready
+static void sockaway(Myport *m, char *buff, int size)
+{
+    if (m->buff == NULL) {
+        m->buff = (char *)malloc(size);
+        if (m->buff) {
+            m->buffsize = size;
+            memcpy(m->buff, buff, size);
+        }
+    } else {
+        char *newbuff = (char *)malloc(size + m->buffsize);
+        if (newbuff) {
+            memcpy(newbuff, m->buff, m->buffsize);
+            memcpy(newbuff + m->buffsize, buff, size);
+            free(m->buff);
+            m->buff = newbuff;
+            m->buffsize += size;
+        }
+    }
+}
+
+// Send buffered data when socket connects
+static void sendsockedaway(Myport *mp)
+{
+    if (mp->sockstate != SOCK_CONNECTED) {
+        return;
+    }
+    if (mp->buff != NULL) {
+        char *p = mp->buff;
+        int sz = mp->buffsize;
+        mp->buff = NULL;
+        mp->buffsize = 0;
+        js_websocket_send(mp->portId, p, sz);
+        free(p);
+    }
+}
+
+// WebSocket event callback from JavaScript
+EMSCRIPTEN_KEEPALIVE
+void mdep_on_websocket_event(int portId, const char *event)
+{
+    printf("[PORT C] WebSocket event on port %d: %s\n", portId, event);
+
+    // Find the port
+    Myport *m;
+    for (m = Topport; m != NULL; m = m->next) {
+        if (m->portId == portId) {
+            if (strcmp(event, "open") == 0) {
+                m->sockstate = SOCK_CONNECTED;
+                sendsockedaway(m);  // Send any buffered data
+            } else if (strcmp(event, "data") == 0) {
+                m->portstate = PORT_CANREAD;
+            } else if (strcmp(event, "close") == 0) {
+                m->sockstate = SOCK_CLOSED;
+            } else if (strcmp(event, "error") == 0) {
+                m->sockstate = SOCK_REFUSED;
+            }
+            break;
+        }
+    }
 }

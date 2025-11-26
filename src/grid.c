@@ -50,8 +50,6 @@ startgraphics(void)
 		sprintf(Msg1,"Hey, there aren't enough colors!!  Colors=%ld",*Colors);
 		mdep_popup(Msg1);
 	}
-	else
-		mdep_initcolors();
 	mdep_setcursor(M_ARROW);
 	m_init();
 	reinitwinds();
