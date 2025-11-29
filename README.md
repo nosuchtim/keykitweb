@@ -32,7 +32,7 @@ Originally released in 1996, KeyKit has been used by musicians and composers wor
 
 ## Local Directory
 
-To allow the saving of things, the local directory is synced with the virtual /keykit/local directory.
+To allow the saving of things, the local directory is synced with the virtual /keykit/local directory.  MIDI (\*.mid) files go in local/music, and pages (\*.kp) go in local/pages.
 
 ## Building
 
