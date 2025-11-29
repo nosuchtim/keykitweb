@@ -857,7 +857,6 @@ function normexit() {
 #desc	screen size.
 
 function normresize() {
-	print("HI from normresize")
 	lock("redrawresize")
 	if ( ! defined(Oldrootsize) ) {
 		Oldrootsize = screen("size")
@@ -894,13 +893,13 @@ function normresize() {
 	}
 	Oldrootsize = sz
 
-	sleeptill(Now+1b)
+	Root.redraw()
+
+	sleeptill(Now+4b)
 	print("Doing another redraw")
 	Root.redraw()
 	
 	unlock("redrawresize")
-
-	print("BYE from normresize")
 }
 
 #name	canonic

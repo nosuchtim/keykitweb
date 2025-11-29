@@ -188,6 +188,13 @@
             </div>
         </div>
 
+        <div id="local-sync-status" style="margin: 10px 0; text-align: center;">
+            <button id="connect-local-btn" onclick="if(window.requestLocalDirAccess) requestLocalDirAccess().then(ok => { if(ok && window.updateSyncStatus) updateSyncStatus(); }); else alert('Please wait for KeyKit to finish loading');" style="padding: 5px 15px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                Connect Local Folder
+            </button>
+            <span id="sync-status-text" style="margin-left: 10px; color: #888;">Loading...</span>
+        </div>
+
         <div id="canvas-container">
             <canvas id="keykit-canvas" tabindex="0"></canvas>
         </div>
@@ -378,34 +385,288 @@
                     const files = Module.FS.readdir('/keykit/lib');
                     console.log(`Virtual filesystem contains ${files.length - 2} files`);
 
-                    // Create pages directory for saving/loading page files
+                    // Create /keykit/local directory and mount IDBFS for persistent storage
                     try {
-                        Module.FS.mkdir('/keykit/pages');
+                        Module.FS.mkdir('/keykit/local');
                     } catch (err) { /* may exist */ }
-                    console.log('Created /keykit/pages directory');
 
-                    // Load page files from manifest
+                    // Mount IDBFS for persistent storage
                     try {
-                        const pagesResponse = await fetch('../pages/pages_manifest.json');
+                        Module.FS.mount(Module.IDBFS, {}, '/keykit/local');
+                        console.log('Mounted IDBFS on /keykit/local');
+
+                        // Load any previously saved data from IndexedDB (with timeout)
+                        await new Promise((resolve) => {
+                            const timeout = setTimeout(() => {
+                                console.warn('IDBFS sync timed out, continuing without IndexedDB data');
+                                resolve();
+                            }, 5000);
+
+                            Module.FS.syncfs(true, function(err) {
+                                clearTimeout(timeout);
+                                if (err) {
+                                    console.error('Error loading from IndexedDB:', err);
+                                } else {
+                                    console.log('Loaded local files from IndexedDB');
+                                }
+                                resolve();
+                            });
+                        });
+                    } catch (mountErr) {
+                        console.error('Failed to mount IDBFS:', mountErr);
+                    }
+
+                    // Create pages subdirectory if it doesn't exist
+                    try {
+                        Module.FS.mkdir('/keykit/local/pages');
+                    } catch (err) { /* may exist */ }
+                    console.log('Created /keykit/local/pages directory');
+
+                    // Load page files from manifest (only if not already in IndexedDB)
+                    try {
+                        const pagesResponse = await fetch('../local/pages/pages_manifest.json');
                         const pageFiles = await pagesResponse.json();
                         console.log(`Found ${pageFiles.length} page files in manifest`);
 
+                        // Get existing files from IndexedDB
+                        let existingFiles = [];
+                        try {
+                            existingFiles = Module.FS.readdir('/keykit/local/pages');
+                        } catch (err) { /* directory might be empty */ }
+
                         for (const filename of pageFiles) {
+                            // Skip if file already exists (IndexedDB wins)
+                            if (existingFiles.includes(filename)) {
+                                console.log(`Skipping ${filename} (already in IndexedDB)`);
+                                continue;
+                            }
                             try {
-                                const fileResponse = await fetch(`../pages/${filename}`);
+                                const fileResponse = await fetch(`../local/pages/${filename}`);
                                 const content = await fileResponse.arrayBuffer();
                                 const uint8Array = new Uint8Array(content);
-                                Module.FS.writeFile(`/keykit/pages/${filename}`, uint8Array);
+                                Module.FS.writeFile(`/keykit/local/pages/${filename}`, uint8Array);
                             } catch (err) {
-                                console.warn(`Failed to load pages/${filename}:`, err);
+                                console.warn(`Failed to load local/pages/${filename}:`, err);
                             }
                         }
-                        console.log(`Loaded ${pageFiles.length} page files into /keykit/pages/`);
+                        console.log(`Loaded page files into /keykit/local/pages/`);
                     } catch (err) {
-                        console.log('No pages manifest found, creating empty pages directory');
-                        // Create a placeholder file to ensure directory is writable
-                        Module.FS.writeFile('/keykit/pages/.placeholder', 'This directory is for saving KeyKit page files.');
+                        console.log('No pages manifest found in local/pages/');
                     }
+
+                    // Set up File System Access API for real filesystem sync
+                    window.keykitLocalDirHandle = null;
+
+                    // Request access to local directory (call this once via UI)
+                    window.requestLocalDirAccess = async function() {
+                        try {
+                            window.keykitLocalDirHandle = await window.showDirectoryPicker({
+                                id: 'keykit-local',
+                                mode: 'readwrite',
+                                startIn: 'documents'
+                            });
+                            console.log('Got access to directory:', window.keykitLocalDirHandle.name);
+
+                            // Store the handle in IndexedDB for persistence
+                            try {
+                                const db = await new Promise((resolve, reject) => {
+                                    const request = indexedDB.open('keykit-handles', 1);
+                                    request.onerror = () => reject(request.error);
+                                    request.onsuccess = () => resolve(request.result);
+                                    request.onupgradeneeded = (e) => {
+                                        e.target.result.createObjectStore('handles');
+                                    };
+                                });
+                                const tx = db.transaction('handles', 'readwrite');
+                                tx.objectStore('handles').put(window.keykitLocalDirHandle, 'localDir');
+                                await new Promise((resolve, reject) => {
+                                    tx.oncomplete = resolve;
+                                    tx.onerror = () => reject(tx.error);
+                                });
+                                db.close();
+                            } catch (dbErr) {
+                                console.warn('Could not save directory handle to IndexedDB:', dbErr);
+                            }
+
+                            return true;
+                        } catch (err) {
+                            console.error('Failed to get directory access:', err);
+                            return false;
+                        }
+                    };
+
+                    // Try to restore saved directory handle
+                    window.restoreLocalDirAccess = async function() {
+                        try {
+                            const db = await new Promise((resolve, reject) => {
+                                const request = indexedDB.open('keykit-handles', 1);
+                                request.onerror = () => reject(request.error);
+                                request.onsuccess = () => resolve(request.result);
+                                request.onupgradeneeded = (e) => {
+                                    e.target.result.createObjectStore('handles');
+                                };
+                            });
+                            const tx = db.transaction('handles', 'readonly');
+                            const handle = await new Promise((resolve, reject) => {
+                                const request = tx.objectStore('handles').get('localDir');
+                                request.onerror = () => reject(request.error);
+                                request.onsuccess = () => resolve(request.result);
+                            });
+                            db.close();
+
+                            if (handle) {
+                                // Verify we still have permission
+                                const permission = await handle.queryPermission({ mode: 'readwrite' });
+                                if (permission === 'granted') {
+                                    window.keykitLocalDirHandle = handle;
+                                    console.log('Restored directory access:', handle.name);
+                                    return true;
+                                }
+                                // Don't try to request permission here - it requires user gesture
+                                console.log('Directory handle found but permission not granted');
+                            }
+                        } catch (err) {
+                            console.log('Could not restore directory access:', err);
+                        }
+                        return false;
+                    };
+
+                    // Sync a file to the real filesystem
+                    window.syncFileToReal = async function(virtualPath) {
+                        if (!window.keykitLocalDirHandle) {
+                            console.log('No directory handle - call requestLocalDirAccess() first');
+                            return false;
+                        }
+
+                        try {
+                            // Get relative path from /keykit/local/
+                            const relativePath = virtualPath.replace('/keykit/local/', '');
+                            const parts = relativePath.split('/');
+                            const filename = parts.pop();
+
+                            // Navigate/create subdirectories
+                            let dirHandle = window.keykitLocalDirHandle;
+                            for (const part of parts) {
+                                dirHandle = await dirHandle.getDirectoryHandle(part, { create: true });
+                            }
+
+                            // Read from virtual filesystem
+                            const data = Module.FS.readFile(virtualPath);
+
+                            // Write to real filesystem
+                            const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
+                            const writable = await fileHandle.createWritable();
+                            await writable.write(data);
+                            await writable.close();
+
+                            console.log('Synced to real filesystem:', relativePath);
+                            return true;
+                        } catch (err) {
+                            console.error('Failed to sync file:', err);
+                            return false;
+                        }
+                    };
+
+                    // Sync all files in /keykit/local to real filesystem
+                    window.syncAllLocalToReal = async function() {
+                        if (!window.keykitLocalDirHandle) {
+                            console.log('No directory handle - requesting access...');
+                            if (!await window.requestLocalDirAccess()) {
+                                return false;
+                            }
+                        }
+
+                        try {
+                            // Sync pages directory
+                            try {
+                                const pageFiles = Module.FS.readdir('/keykit/local/pages');
+                                for (const file of pageFiles) {
+                                    if (file === '.' || file === '..') continue;
+                                    await window.syncFileToReal('/keykit/local/pages/' + file);
+                                }
+                            } catch (err) { /* pages dir may not exist */ }
+
+                            // Sync music directory
+                            try {
+                                const musicFiles = Module.FS.readdir('/keykit/local/music');
+                                for (const file of musicFiles) {
+                                    if (file === '.' || file === '..') continue;
+                                    await window.syncFileToReal('/keykit/local/music/' + file);
+                                }
+                            } catch (err) { /* music dir may not exist */ }
+
+                            // Sync lib directory
+                            try {
+                                const libFiles = Module.FS.readdir('/keykit/local/lib');
+                                for (const file of libFiles) {
+                                    if (file === '.' || file === '..') continue;
+                                    await window.syncFileToReal('/keykit/local/lib/' + file);
+                                }
+                            } catch (err) { /* lib dir may not exist */ }
+
+                            return true;
+                        } catch (err) {
+                            console.error('Failed to sync local files:', err);
+                            return false;
+                        }
+                    };
+
+                    // Alias for backwards compatibility
+                    window.syncAllPagesToReal = window.syncAllLocalToReal;
+
+                    // Set up debounced sync for file writes
+                    window.keykitSyncTimer = null;
+                    window.keykitSyncInProgress = false;
+                    window.scheduleLocalSync = function() {
+                        if (window.keykitSyncTimer) clearTimeout(window.keykitSyncTimer);
+                        window.keykitSyncTimer = setTimeout(async function() {
+                            // Skip if a sync is already in progress
+                            if (window.keykitSyncInProgress) {
+                                console.log('Sync already in progress, skipping');
+                                window.keykitSyncTimer = null;
+                                return;
+                            }
+                            window.keykitSyncInProgress = true;
+
+                            // Sync to IndexedDB
+                            await new Promise((resolve) => {
+                                Module.FS.syncfs(false, function(err) {
+                                    if (err) console.error('Sync to IndexedDB error:', err);
+                                    else console.log('Synced /keykit/local to IndexedDB');
+                                    resolve();
+                                });
+                            });
+
+                            // Also sync to real filesystem if we have access
+                            if (window.keykitLocalDirHandle) {
+                                await window.syncAllLocalToReal();
+                            }
+
+                            window.keykitSyncInProgress = false;
+                            window.keykitSyncTimer = null;
+                        }, 2000);
+                    };
+
+                    // Update sync status UI
+                    window.updateSyncStatus = function() {
+                        const btn = document.getElementById('connect-local-btn');
+                        const status = document.getElementById('sync-status-text');
+                        if (window.keykitLocalDirHandle) {
+                            btn.textContent = 'Change Folder';
+                            btn.style.background = '#666';
+                            status.textContent = 'Connected: ' + window.keykitLocalDirHandle.name;
+                            status.style.color = '#4CAF50';
+                        } else {
+                            btn.textContent = 'Connect Local Folder';
+                            btn.style.background = '#4CAF50';
+                            status.textContent = 'Not connected - files only saved to browser';
+                            status.style.color = '#888';
+                        }
+                    };
+
+                    // Try to restore directory access on startup
+                    await window.restoreLocalDirAccess();
+                    window.updateSyncStatus();
 
                     // Now load music files
                     try {

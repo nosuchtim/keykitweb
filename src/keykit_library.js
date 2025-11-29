@@ -631,16 +631,37 @@ mergeInto(LibraryManager.library, {
             var match = types.match(/\*\.(\w+)/);
             if (match) ext = '.' + match[1].toLowerCase();
 
+            // Determine directory based on file type
+            var dir = '/keykit/local/pages';
+            if (ext === '.mid' || ext === '.midi' || ext === '.kg') {
+                dir = '/keykit/local/music';
+            } else if (ext === '.k') {
+                dir = '/keykit/local/lib';
+            }
+
             var defaultName = 'untitled' + ext;
-            var filename = prompt('Enter filename to save (in /keykit/pages/):', defaultName);
+            var filename = prompt('Enter filename to save (in ' + dir + '/):', defaultName);
 
             if (filename) {
                 // Ensure it has the right extension
                 if (ext && !filename.toLowerCase().endsWith(ext)) {
                     filename = filename + ext;
                 }
-                window.keykitBrowseResult = '/keykit/pages/' + filename;
+                window.keykitBrowseResult = dir + '/' + filename;
                 console.log('[BROWSE] Save filename: ' + window.keykitBrowseResult);
+
+                // Create directories if needed
+                try {
+                    Module.FS.mkdir('/keykit/local/music');
+                } catch (err) { /* may exist */ }
+                try {
+                    Module.FS.mkdir('/keykit/local/lib');
+                } catch (err) { /* may exist */ }
+
+                // Schedule sync to IndexedDB after file is written
+                if (window.scheduleLocalSync) {
+                    setTimeout(window.scheduleLocalSync, 100);
+                }
             } else {
                 console.log('[BROWSE] Save dialog cancelled');
                 window.keykitBrowseResult = null;
@@ -663,16 +684,34 @@ mergeInto(LibraryManager.library, {
                 var reader = new FileReader();
                 reader.onload = function(evt) {
                     var data = new Uint8Array(evt.target.result);
-                    var filename = '/keykit/pages/' + file.name;
 
-                    // Create pages directory if needed
+                    // Determine directory based on file extension
+                    var ext = file.name.toLowerCase().split('.').pop();
+                    var dir = '/keykit/local/pages';
+                    if (ext === 'mid' || ext === 'midi' || ext === 'kg') {
+                        dir = '/keykit/local/music';
+                    } else if (ext === 'k') {
+                        dir = '/keykit/local/lib';
+                    }
+
+                    var filename = dir + '/' + file.name;
+
+                    // Create directories if needed
                     try {
-                        Module.FS.mkdir('/keykit/pages');
+                        Module.FS.mkdir('/keykit/local');
+                    } catch (err) { /* may exist */ }
+                    try {
+                        Module.FS.mkdir(dir);
                     } catch (err) { /* may exist */ }
 
                     // Write file to virtual filesystem
                     Module.FS.writeFile(filename, data);
                     console.log('[BROWSE] Loaded file: ' + filename + ' (' + data.length + ' bytes)');
+
+                    // Schedule sync to IndexedDB
+                    if (window.scheduleLocalSync) {
+                        window.scheduleLocalSync();
+                    }
 
                     window.keykitBrowseResult = filename;
                     window.keykitBrowseDone = true;
