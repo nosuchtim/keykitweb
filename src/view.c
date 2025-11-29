@@ -263,22 +263,9 @@ i_dosweepcont(void)
 		mx = (int)lmx; my = (int)lmy;
 	}
 
-	// js_set_composite_operation("source-over");
-	// js_set_composite_operation("copy");
-	js_set_composite_operation("source-over");
-	// mdep_color(sweep_color);
-	mdep_color(0);
-	// drawsweep(w,type,x0,y0,x1,y1);
-	// drawsweep(w,type,sweep_save_x0,sweep_save_y0,sweep_save_x1,sweep_save_y1);
-	mdep_boxfill(sweep_save_x0,sweep_save_y0,sweep_save_x1,sweep_save_y1);
-
 	if ( mval != 0 ) {
 		changed = (mx!=x1 || my!=y1);
 		if ( changed ) {
-
-			// js_set_composite_operation("source-over");
-			// mdep_color(8);
-
 			(Stackp-2)->u.val = mx;
 			(Stackp-1)->u.val = my;
 
@@ -287,12 +274,9 @@ i_dosweepcont(void)
 			sweep_save_x1 = mx;
 			sweep_save_y1 = my;
 
-			// js_set_composite_operation("source-over");
+			// Draw new sweep indicator (will leave artifacts during sweep, cleaned up at end)
 			mdep_color(sweep_color);
-			js_set_composite_operation("source-over");
 			drawsweep(w,type,sweep_save_x0,sweep_save_y0,sweep_save_x1,sweep_save_y1);
-
-			// drawsweep(w,type,x0,y0,x1,y1);
 		}
 		setpc(i);	/* loop back to i_dosweepcont() */
 		mouseblock(mf);
@@ -300,15 +284,8 @@ i_dosweepcont(void)
 	}
 	/* sweep has ended */
 
-	// mdep_color(0);
-	// mdep_color(sweep_savecolor);
-	// drawsweep(w,type,sweep_save_x0,sweep_save_y0,sweep_save_x1,sweep_save_y1);
-	// drawsweep(w,type,x0,y0,x1,y1);
-
-	mdep_color(0);
-	// drawsweep(w,type,x0,y0,x1,y1);
-	// drawsweep(w,type,sweep_save_x0,sweep_save_y0,sweep_save_x1,sweep_save_y1);
-	mdep_boxfill(sweep_save_x0,sweep_save_y0,sweep_save_x1,sweep_save_y1);
+	// Redraw the window to clean up sweep artifacts
+	wredraw1(w);
 	mdep_color(sweep_savecolor);
 
 	mdep_setcursor(M_ARROW);

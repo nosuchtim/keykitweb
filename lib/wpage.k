@@ -105,6 +105,7 @@ method deletetool (o) {
 	o.erase()
 	$.removechild(o)
 	deleteobject(o)
+	$.redraw()
 }
 method addtool (o,sz) {
 	if ( nargs() > 1 && typeof(sz) != "array" ) {
@@ -114,6 +115,7 @@ method addtool (o,sz) {
 	$.addchild(o)
 	if ( nargs() > 1 )
 		o.resize(sz)
+	$.redraw()
 	return(o)
 }
 method stop {

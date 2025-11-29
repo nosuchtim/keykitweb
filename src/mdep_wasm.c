@@ -247,10 +247,12 @@ mdep_popup(char *s)
     }
 }
 
+extern void js_set_cursor(int cursorType);
+
 void
 mdep_setcursor(int c)
 {
-    // No-op for now
+    js_set_cursor(c);
 }
 
 void
@@ -333,6 +335,7 @@ typedef struct {
     int x;
     int y;
     int buttons;
+    int modifiers;   // 1=Ctrl, 2=Shift
     int event_type;  // 0 = move, 1 = button down, 2 = button up
 } MouseEvent;
 
@@ -409,23 +412,18 @@ int mdep_mouse_convert(int buttons) {
 
 // Callback from JavaScript for mouse movement
 EMSCRIPTEN_KEEPALIVE
-void mdep_on_mouse_move(int x, int y)
+void mdep_on_mouse_move(int x, int y, int modifiers)
 {
     // Update current mouse position
     current_mouse_x = x;
     current_mouse_y = y;
-
-    // if (current_mouse_buttons != 0) {
-    //     sprintf(Msg1,"TJT DEBUG mdep_on_mouse_move called, x=%d y=%d current_mouse_buttons=%d\n",
-    //         x,y,current_mouse_buttons);
-    //     mdep_popup(Msg1);
-    // }
 
     // Buffer the mouse move event
     if (mouse_buffer_count < MOUSE_BUFFER_SIZE) {
         mouse_buffer[mouse_buffer_write_pos].x = x;
         mouse_buffer[mouse_buffer_write_pos].y = y;
         mouse_buffer[mouse_buffer_write_pos].buttons = current_mouse_buttons;
+        mouse_buffer[mouse_buffer_write_pos].modifiers = modifiers;
         mouse_buffer[mouse_buffer_write_pos].event_type = 0; // move
         mouse_buffer_write_pos++;
         if (mouse_buffer_write_pos >= MOUSE_BUFFER_SIZE)
@@ -436,22 +434,19 @@ void mdep_on_mouse_move(int x, int y)
 
 // Callback from JavaScript for mouse button events
 EMSCRIPTEN_KEEPALIVE
-void mdep_on_mouse_button(int down, int x, int y, int buttons)
+void mdep_on_mouse_button(int down, int x, int y, int buttons, int modifiers)
 {
     // Update current mouse state
     current_mouse_x = x;
     current_mouse_y = y;
     current_mouse_buttons = mdep_mouse_convert(buttons);
 
-    // sprintf(Msg1,"TJT DEBUG mdep_on_mouse_button called, down=%d x=%d y=%d current_mouse_buttons=%d\n",
-    //     down, x,y,current_mouse_buttons);
-    // mdep_popup(Msg1);
-
     // Buffer the mouse button event
     if (mouse_buffer_count < MOUSE_BUFFER_SIZE) {
         mouse_buffer[mouse_buffer_write_pos].x = x;
         mouse_buffer[mouse_buffer_write_pos].y = y;
         mouse_buffer[mouse_buffer_write_pos].buttons = current_mouse_buttons;
+        mouse_buffer[mouse_buffer_write_pos].modifiers = modifiers;
         mouse_buffer[mouse_buffer_write_pos].event_type = down ? 1 : 2; // 1 = button down, 2 = button up
         mouse_buffer_write_pos++;
         if (mouse_buffer_write_pos >= MOUSE_BUFFER_SIZE)
@@ -515,7 +510,7 @@ int mdep_alt_down(void)
 }
 
 // Helper functions for mouse event buffer access
-int mdep_get_mouse_event(int *x, int *y, int *buttons, int *event_type)
+int mdep_get_mouse_event(int *x, int *y, int *buttons, int *event_type, int *modifiers)
 {
     if (mouse_buffer_count > 0) {
         MouseEvent *event = &mouse_buffer[mouse_buffer_read_pos];
@@ -523,6 +518,7 @@ int mdep_get_mouse_event(int *x, int *y, int *buttons, int *event_type)
         *y = event->y + 6;  // HACK?? Adjust for browser offset?
         *buttons = event->buttons;
         *event_type = event->event_type;
+        *modifiers = event->modifiers;
 
         mouse_buffer_read_pos++;
         if (mouse_buffer_read_pos >= MOUSE_BUFFER_SIZE)
@@ -1354,23 +1350,11 @@ mdep_plotmode(int mode)
 {
     // Set plot mode
     if (mode == 2) {
-        execerror("mdep_plotmode: mode == 2!!!!!!!!!!!!!!!!!");
-        js_set_composite_operation("difference");
+        execerror("mdep_plotmode: mode == 2 is obsolete!");
     } else if (mode == 1) {
-        // mdep_popup("mdep_plotmode: mode == 1!!!!!!!!!!!!!!!!!");
         js_set_composite_operation("source-over");
     } else {
-        // execerror("mdep_plotmode: mode == 0!!!!!!!!!!!!!!!!!");
-        // mdep_popup("mdep_plotmode: mode == 0!!!!!!!!!!!!!!!!!");
         js_set_composite_operation("destination-out");
-
-        // mdep_color(5);
-        // js_set_composite_operation("copy");
-
-        // int c = current_color_index;
-        // mdep_color(0);
-        // js_set_composite_operation("source-over");
-        // mdep_color(c);
     }
 }
 
@@ -1392,6 +1376,7 @@ mdep_screenresize(int x0, int y0, int x1, int y1)
 }
 
 // Font functions
+// Returns NULL on success, error message on failure
 char *
 mdep_fontinit(char *fnt)
 {
@@ -1406,8 +1391,8 @@ mdep_fontinit(char *fnt)
         js_set_font("16px monospace");
     }
 
-    // Return default font name
-    return "monospace";
+    // Return NULL to indicate success
+    return NULL;
 }
 
 int
@@ -1443,12 +1428,23 @@ mdep_colormix(int c, int r, int g, int b)
 void
 mdep_initcolors(void)
 {
+    /*
+     * for reference, here are the default values of the various
+     * colors used, especially important for buttons 
+            int Backcolor = 0;
+            int Forecolor = 1;
+            int Pickcolor = 2;
+            int Lightcolor = 3;
+            int Darkcolor = 4;
+            int ButtonBGcolor = 5;
+     */
+
 	strcpy(color_list[0], "rgb(0,0,0)");       // Black
 	strcpy(color_list[1], "rgb(255,255,255)"); // White
 	strcpy(color_list[2], "rgb(255,0,0)");     // Red
-	strcpy(color_list[3], "rgb(0,255,255)");   // Cyan
-	strcpy(color_list[4], "rgb(0,255,0)");     // Green
-	strcpy(color_list[5], "rgb(255,0,255)");   // Magenta
+	strcpy(color_list[3], "rgb(200,200,200)"); // Lighter Grey (button highlight bg)
+	strcpy(color_list[4], "rgb(150,150,150)"); // Light grey (button pressed bg)
+	strcpy(color_list[5], "rgb(100,100,100)"); // Dark grey (button normal bg)
 	strcpy(color_list[6], "rgb(255,255,0)");   // Yellow
 	strcpy(color_list[7], "rgb(0,0,255)");     // Blue
 	strcpy(color_list[8], "rgb(128,128,128)"); // Gray

@@ -738,10 +738,18 @@ newfifo(char *fname,char *mode,char *porttype,Fifo **pf1,Fifo **pf2)
 #endif
 	}
 	else if ( strcmp(porttype,"file") == 0 ) {
-		if ( (flags&FIFO_WRITE) != 0 )
+		if ( (flags&FIFO_WRITE) != 0 ) {
 			fp = fopen(fname,"w");
-		else if ( (flags&FIFO_APPEND) != 0 )
+			if ( fp==NULL ) {
+				eprint("Error in fopen(%s,\"w\"): errno=%d\n",fname,errno);
+			}
+		}
+		else if ( (flags&FIFO_APPEND) != 0 ) {
 			fp = fopen(fname,"a");
+			if ( fp==NULL ) {
+				eprint("Error in fopen(%s,\"a\"): errno=%d\n",fname,errno);
+			}
+		}
 		else {
 			fp = fopen(fname,"r");
 			flags |= FIFO_READ;	 /* in case it wasn't explicit */

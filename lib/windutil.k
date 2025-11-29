@@ -439,9 +439,10 @@ function grabmouse(w) {
 	if ( Mousegrabwind != -1 ) {
 		if ( ! defined(Mousegrabwind) )
 			print("Hey, Mousegrabwind is undefined!?")
-		else
-			print("Hey, Mousegrabwind is defined... =",Mousegrabwind)
+		else {
+			# print("Hey, Mousegrabwind is defined... =",Mousegrabwind)
 			# print("Hey, Mousegrabwind=",Mousegrabwind," in grabmouse() Traceback = ",taskinfo(gettid(),"fulltrace"))
+		}
 	}
 	Mousegrabwind = w
 	return(Mousegrabwind)

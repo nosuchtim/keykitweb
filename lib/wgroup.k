@@ -409,7 +409,6 @@ method patchphrase (tn) {
 
 method notifyaud (co,v){
 	$.audition=["start"=v["x0"],"end"=v["x1"]]
-	print("notifyaud audition=",$.audition)
 }
 
 method notifypickh (co,v) { $.notifypicksweep(co,v,0,"") }
@@ -452,6 +451,7 @@ method makebuttonarray(t) {
 }
 
 method buttinfo() {
+
 	# This magic array drives the creation and semantics of the
 	# mouse button menus in the wgroup tool.
 
@@ -1983,6 +1983,7 @@ method mousedown(m) {
 
 		btype = $.val2buttontype[val]
 		meth = $.val2notifymeth[val]
+
 		if ( val in $.val2controller )
 			$.drawcontroller = $.val2controller[val]
 		if ( val in $.val2arg )

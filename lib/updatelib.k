@@ -2,7 +2,6 @@
 # mentioned in Keypath) need updating, and updates them.
 
 function updatelib(forceit,forcerekeylib,path,reread) {
-	print("updatelib called")
 	if ( nargs() < 1 )
 		forceit = 0
 	if ( nargs() < 2 )
@@ -60,6 +59,7 @@ function updatelib(forceit,forcerekeylib,path,reread) {
 		}
 		if ( updateit ) {
 			anyupdated = 1
+			# print("UPDATING "+keylibfn+"\n")
 			klf = open(keylibfn,"w")
 			for ( fn in files ) {
 				fullpath = dir + Dirseparator + fn

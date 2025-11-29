@@ -1465,17 +1465,18 @@ checkmouse(void)
 	static int oldx = -1;
 	static int oldy = -1;
 	static int oldm = -1;
-	int m, x, y, mod, b;
+	int m, x, y, buttons, b;
 	int moved;
 	int pressed = 0;
 	int event_type;
+	int modifiers;  /* keyboard modifiers: 1=Ctrl, 2=Shift */
 
 	if ( *Mousedisable )
 		return;
 
 	/* Process all mouse events in the buffer */
-	while ( mdep_get_mouse_event(&x, &y, &mod, &event_type) ) {
-		m = mod & 3;	/* We only want to acknowledge button 1&2 */
+	while ( mdep_get_mouse_event(&x, &y, &buttons, &event_type, &modifiers) ) {
+		m = buttons & 3;	/* We only want to acknowledge button 1&2 */
 
 		moved = (x!=oldx || y!=oldy);
 
@@ -1503,7 +1504,7 @@ checkmouse(void)
 			oldx = x;
 			oldy = y;
 		}
-		putonmousefifo(m,x,y,pressed,mod);
+		putonmousefifo(m,x,y,pressed,modifiers);
 	}
 }
 

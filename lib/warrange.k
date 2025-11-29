@@ -52,4 +52,5 @@ function warrange(dir) {
 		oarray[n].resize(osz)
 		oarray[n].redraw()
 	}
+	Root.redraw()
 }

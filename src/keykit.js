@@ -4402,8 +4402,38 @@ async function createWasm() {
           // Convert types like "*.mid;*.MID" to accept attribute format ".mid,.MID"
           var accept = types.replace(/\*\./g, '.').replace(/;/g, ',');
   
-          console.log('[BROWSE] Opening file dialog, desc=' + desc + ' types=' + types + ' accept=' + accept);
+          console.log('[BROWSE] Opening file dialog, desc=' + desc + ' types=' + types + ' mustexist=' + mustexist);
   
+          // Use a global to store the result since we need to block
+          window.keykitBrowseResult = null;
+          window.keykitBrowseDone = false;
+  
+          if (mustexist == 0) {
+              // SAVE mode: prompt for filename to save to virtual filesystem
+              // Extract default extension from types (e.g., "*.kp" -> ".kp")
+              var ext = '';
+              var match = types.match(/\*\.(\w+)/);
+              if (match) ext = '.' + match[1].toLowerCase();
+  
+              var defaultName = 'untitled' + ext;
+              var filename = prompt('Enter filename to save (in /keykit/pages/):', defaultName);
+  
+              if (filename) {
+                  // Ensure it has the right extension
+                  if (ext && !filename.toLowerCase().endsWith(ext)) {
+                      filename = filename + ext;
+                  }
+                  window.keykitBrowseResult = '/keykit/pages/' + filename;
+                  console.log('[BROWSE] Save filename: ' + window.keykitBrowseResult);
+              } else {
+                  console.log('[BROWSE] Save dialog cancelled');
+                  window.keykitBrowseResult = null;
+              }
+              window.keykitBrowseDone = true;
+              return 0;
+          }
+  
+          // LOAD mode: use file input dialog to load from real filesystem
           // Create a hidden file input element
           var input = document.createElement('input');
           input.type = 'file';
@@ -4411,21 +4441,17 @@ async function createWasm() {
           input.style.display = 'none';
           document.body.appendChild(input);
   
-          // Use a global to store the result since we need to block
-          window.keykitBrowseResult = null;
-          window.keykitBrowseDone = false;
-  
           input.onchange = function(e) {
               var file = e.target.files[0];
               if (file) {
                   var reader = new FileReader();
                   reader.onload = function(evt) {
                       var data = new Uint8Array(evt.target.result);
-                      var filename = '/keykit/uploads/' + file.name;
+                      var filename = '/keykit/pages/' + file.name;
   
-                      // Create uploads directory if needed
+                      // Create pages directory if needed
                       try {
-                          Module.FS.mkdir('/keykit/uploads');
+                          Module.FS.mkdir('/keykit/pages');
                       } catch (err) { /* may exist */ }
   
                       // Write file to virtual filesystem
@@ -4916,6 +4942,21 @@ async function createWasm() {
           ctx.globalCompositeOperation = UTF8ToString(operation);
       }
 
+  function _js_set_cursor(cursorType) {
+          var canvas = document.getElementById('keykit-canvas');
+          if (!canvas) return;
+          var cursor;
+          switch (cursorType) {
+              case 1: cursor = 'default'; break;      // M_ARROW
+              case 2: cursor = 'nwse-resize'; break;  // M_SWEEP (diagonal for sweeping regions)
+              case 3: cursor = 'crosshair'; break;    // M_CROSS
+              case 4: cursor = 'col-resize'; break;    // M_LEFTRIGHT
+              case 5: cursor = 'row-resize'; break;    // M_UPDOWN
+              default: cursor = 'default'; break;
+          }
+          canvas.style.cursor = cursor;
+      }
+
   function _js_set_font(font) {
           var canvas = document.getElementById('keykit-canvas');
           if (!canvas) return;
@@ -4997,17 +5038,26 @@ async function createWasm() {
           window.keykitMouseY = 0;
           window.keykitMouseButtons = 0;
   
+          // Helper to get modifier bits (1=Ctrl, 2=Shift)
+          function getModifierBits(e) {
+              var mod = 0;
+              if (e.ctrlKey) mod |= 1;
+              if (e.shiftKey) mod |= 2;
+              return mod;
+          }
+  
           // Mouse move event
           canvas.addEventListener('mousemove', function(e) {
               var rect = canvas.getBoundingClientRect();
               window.keykitMouseX = Math.floor(e.clientX - rect.left);
               window.keykitMouseY = Math.floor(e.clientY - rect.top);
+              window.keykitMouseModifiers = getModifierBits(e);
   
               // Call C callback if defined
               if (typeof Module !== 'undefined' && Module.ccall) {
                   Module.ccall('mdep_on_mouse_move', null,
-                               ['number', 'number'],
-                               [window.keykitMouseX, window.keykitMouseY]);
+                               ['number', 'number', 'number'],
+                               [window.keykitMouseX, window.keykitMouseY, window.keykitMouseModifiers]);
               }
           });
   
@@ -5016,14 +5066,15 @@ async function createWasm() {
               var rect = canvas.getBoundingClientRect();
               window.keykitMouseX = Math.floor(e.clientX - rect.left);
               window.keykitMouseY = Math.floor(e.clientY - rect.top);
+              window.keykitMouseModifiers = getModifierBits(e);
   
               // Set button bit (0=left, 1=middle, 2=right)
               window.keykitMouseButtons |= (1 << e.button);
   
               if (typeof Module !== 'undefined' && Module.ccall) {
                   Module.ccall('mdep_on_mouse_button', null,
-                               ['number', 'number', 'number', 'number'],
-                               [1, window.keykitMouseX, window.keykitMouseY, window.keykitMouseButtons]);
+                               ['number', 'number', 'number', 'number', 'number'],
+                               [1, window.keykitMouseX, window.keykitMouseY, window.keykitMouseButtons, window.keykitMouseModifiers]);
               }
           });
   
@@ -5031,14 +5082,15 @@ async function createWasm() {
               var rect = canvas.getBoundingClientRect();
               window.keykitMouseX = Math.floor(e.clientX - rect.left);
               window.keykitMouseY = Math.floor(e.clientY - rect.top);
+              window.keykitMouseModifiers = getModifierBits(e);
   
               // Clear button bit
               window.keykitMouseButtons &= ~(1 << e.button);
   
               if (typeof Module !== 'undefined' && Module.ccall) {
                   Module.ccall('mdep_on_mouse_button', null,
-                               ['number', 'number', 'number', 'number'],
-                               [0, window.keykitMouseX, window.keykitMouseY, window.keykitMouseButtons]);
+                               ['number', 'number', 'number', 'number', 'number'],
+                               [0, window.keykitMouseX, window.keykitMouseY, window.keykitMouseButtons, window.keykitMouseModifiers]);
               }
           });
   
@@ -6185,8 +6237,8 @@ function assignWasmExports(wasmExports) {
   _malloc = createExportWrapper('malloc', 1);
   _free = createExportWrapper('free', 1);
   _mdep_on_midi_message = Module['_mdep_on_midi_message'] = createExportWrapper('mdep_on_midi_message', 4);
-  _mdep_on_mouse_move = Module['_mdep_on_mouse_move'] = createExportWrapper('mdep_on_mouse_move', 2);
-  _mdep_on_mouse_button = Module['_mdep_on_mouse_button'] = createExportWrapper('mdep_on_mouse_button', 4);
+  _mdep_on_mouse_move = Module['_mdep_on_mouse_move'] = createExportWrapper('mdep_on_mouse_move', 3);
+  _mdep_on_mouse_button = Module['_mdep_on_mouse_button'] = createExportWrapper('mdep_on_mouse_button', 5);
   _mdep_on_key_event = Module['_mdep_on_key_event'] = createExportWrapper('mdep_on_key_event', 5);
   _mdep_on_window_resize = Module['_mdep_on_window_resize'] = createExportWrapper('mdep_on_window_resize', 2);
   _mdep_on_nats_message = Module['_mdep_on_nats_message'] = createExportWrapper('mdep_on_nats_message', 2);
@@ -6334,6 +6386,8 @@ var wasmImports = {
   js_set_color: _js_set_color,
   /** @export */
   js_set_composite_operation: _js_set_composite_operation,
+  /** @export */
+  js_set_cursor: _js_set_cursor,
   /** @export */
   js_set_font: _js_set_font,
   /** @export */

@@ -87,7 +87,7 @@ keystart(void)
 {
 	register char *p;
 
-	mdep_popup("keystart: Initializing KeyKit...\n");
+	// mdep_popup("keystart: Initializing KeyKit...\n");
 
 	/* these are dynamically allocated to avoid using global static */
 	/* memory, which some compilers limit to 64 K */

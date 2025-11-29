@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/x-icon" href="keykit.ico">
     <title>KeyKit - WebAssembly Music Programming</title>
     <style>
         body {
@@ -343,7 +344,7 @@
 
                     // Load each file
                     let loaded = 0;
-                    const batchSize = 10;
+                    const batchSize = 5;  // Reduced batch size to avoid network contention
 
                     for (let i = 0; i < libFiles.length; i += batchSize) {
                         const batch = libFiles.slice(i, i + batchSize);
@@ -351,6 +352,9 @@
                         await Promise.all(batch.map(async (filename) => {
                             try {
                                 const fileResponse = await fetch(`../lib/${filename}`);
+                                if (!fileResponse.ok) {
+                                    throw new Error(`HTTP ${fileResponse.status}`);
+                                }
                                 const content = await fileResponse.arrayBuffer();
                                 const uint8Array = new Uint8Array(content);
 
@@ -373,6 +377,35 @@
                     // List files to verify
                     const files = Module.FS.readdir('/keykit/lib');
                     console.log(`Virtual filesystem contains ${files.length - 2} files`);
+
+                    // Create pages directory for saving/loading page files
+                    try {
+                        Module.FS.mkdir('/keykit/pages');
+                    } catch (err) { /* may exist */ }
+                    console.log('Created /keykit/pages directory');
+
+                    // Load page files from manifest
+                    try {
+                        const pagesResponse = await fetch('../pages/pages_manifest.json');
+                        const pageFiles = await pagesResponse.json();
+                        console.log(`Found ${pageFiles.length} page files in manifest`);
+
+                        for (const filename of pageFiles) {
+                            try {
+                                const fileResponse = await fetch(`../pages/${filename}`);
+                                const content = await fileResponse.arrayBuffer();
+                                const uint8Array = new Uint8Array(content);
+                                Module.FS.writeFile(`/keykit/pages/${filename}`, uint8Array);
+                            } catch (err) {
+                                console.warn(`Failed to load pages/${filename}:`, err);
+                            }
+                        }
+                        console.log(`Loaded ${pageFiles.length} page files into /keykit/pages/`);
+                    } catch (err) {
+                        console.log('No pages manifest found, creating empty pages directory');
+                        // Create a placeholder file to ensure directory is writable
+                        Module.FS.writeFile('/keykit/pages/.placeholder', 'This directory is for saving KeyKit page files.');
+                    }
 
                     // Now load music files
                     try {

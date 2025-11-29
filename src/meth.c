@@ -314,7 +314,6 @@ needplotmode(char *meth,Datum d)
 	switch (n) {
 	case P_STORE:
 	case P_CLEAR:
-	// case P_XOR:
 		break;
 	default:
 		execerror("Bad plot mode (%d) given to %s !?",n,meth);
@@ -418,8 +417,6 @@ o_fill(int argc)
 void
 o_ellipse(int argc)
 {
-	// if ( argc > 1 && (int)needplotmode(".ellipse",ARG(1))==P_XOR )
-	//	execerror("Sorry, ellipse drawing doesn't support XOR mode!");
 	o_lineboxfill(argc,".ellipse",kwindellipse,1);
 	ret(Nullval);
 }
@@ -427,8 +424,6 @@ o_ellipse(int argc)
 void
 o_fillellipse(int argc)
 {
-	// if ( argc > 1 && (int)needplotmode(".fillellipse",ARG(1))==P_XOR )
-	//	execerror("Sorry, ellipse drawing doesn't support XOR mode!");
 	o_lineboxfill(argc,".fillellipse",kwindfillellipse,1);
 	ret(Nullval);
 }

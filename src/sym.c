@@ -978,7 +978,7 @@ static char *Stdmacros[] = {
 	"MENU_NOCHOICE -1", "MENU_BACKUP -2", "MENU_UNDEFINED -3",
 	"MENU_MOVE -4", "MENU_DELETE -5",
 	/* values for draw() */
-	"CLEAR 0", "STORE 1", "XOR 2",
+	"CLEAR 0", "STORE 1",
 	/* values for window() */
 	"TEXT 1", "PHRASE 2",
 	/* values for style() */

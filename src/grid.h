@@ -184,7 +184,6 @@ extern struct Pbitmap_struct EmptyBitmap;
 /* values given to graph functions in mdep*.c */
 #define P_CLEAR 0
 #define P_STORE 1
-// #define P_XOR 2
 
 /* values given to mdep_setcursor() */
 #define M_NOTHING 0
