@@ -640,7 +640,6 @@ void
 finalexit(int r)
 NO_RETURN_ATTRIBUTE
 {
-	mdep_popup("TJT DEBUG finalexit: Cleaning up and exiting...\n");
 	mdep_endmidi();
 	mdep_bye();
 	exit(r);
@@ -650,7 +649,6 @@ void
 realexit(int r)
 NO_RETURN_ATTRIBUTE
 {
-	mdep_popup("TJT DEBUG realexit: Finishing off...\n");
 	finishoff();
 	closeallfifos();	/* so ports get closed */
 	finalexit(r);
@@ -1844,7 +1842,6 @@ MAIN(int argc,char **argv)
 			keystr(arg);
 
 			exectasks(0);
-			mdep_popup("TJT DEBUG Setting BB go_interactive=0");
 			go_interactive = 0;
 			nerrs += Errors;
 			continue;
@@ -1863,24 +1860,18 @@ MAIN(int argc,char **argv)
 			go_interactive = 1;
 			continue;
 		}
-		mdep_popup("TJT DEBUG Setting CC go_interactive=0");
 		go_interactive = 0;
 		keyfile(arg,FLAGERROR);
 		exectasks(0);
 	}
 	if ( go_interactive ) {
-		mdep_popup("INTERACTIVE!");
 		Consolefd = realConsolefd;
-		sprintf(Msg1,"TJT DEBUG Consolefd=%d realConsolefd=%d",Consolefd,realConsolefd);
 		if ( do_rc ) {
-			mdep_popup("TJT DEBUG before keystr keyrc");
 			keystr("keyrc();");
 		}
-		mdep_popup("TJT DEBUG before exectasks");
 		exectasks(0);
 		Consolefd = -1;
 	}
-	mdep_popup("TJT DEBUG after interactive");
 
 	finalexit(nerrs);
 	return(nerrs);	/* what the hey... */

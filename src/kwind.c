@@ -396,32 +396,16 @@ kwindtext(Symstr str,int kx0,int ky0,int kx1,int ky1,int just)
 
 	mx = mdep_maxx();
 	if ( kx0 > mx ) {
-		eprint("Warning, invalid x value (%d) in .text, %d is used instead. (str=%s just=%d)",
-			kx0,mx-1,str,just);
 		kx0 = mx-1;
 	}
 	if ( kx1 > mx ) {
-		eprint("Warning, invalid x value (%d) in .text, %d is used instead. (str=%s just=%d)",
-			kx1,mx-1,str,just);
 		kx1 = mx-1;
 	}
-#ifdef OLDSTUFF
-	if ( kx0 > mx || kx1 > mx )
-		execerror("Invalid x value(s) in .text");
-#endif
 	my = mdep_maxy();
-#ifdef OLDSTUFF
-	if ( ky0 > my || ky1 > my )
-		execerror("Invalid y value(s) in .text");
-#endif
 	if ( ky0 > my ) {
-		eprint("Warning, invalid y value (%d) in .text, %d is used instead. (str=%s just=%d)",
-			ky0,my-1,str,just);
 		ky0 = my-1;
 	}
 	if ( ky1 > my ) {
-		eprint("Warning, invalid y value (%d) in .text, %d is used instead. (str=%s just=%d)",
-			ky1,my-1,str,just);
 		ky1 = my-1;
 	}
 

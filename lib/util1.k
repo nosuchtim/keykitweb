@@ -896,7 +896,7 @@ function normresize() {
 	Root.redraw()
 
 	sleeptill(Now+4b)
-	print("Doing another redraw")
+	# print("Doing another redraw")
 	Root.redraw()
 	
 	unlock("redrawresize")
