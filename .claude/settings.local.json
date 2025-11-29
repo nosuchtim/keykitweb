@@ -8,7 +8,10 @@
       "Bash(cat:*)",
       "Bash(bash:*)",
       "Bash(cmd //c build_keylib.bat)",
-      "Bash(python generate_manifest.py:*)"
+      "Bash(python generate_manifest.py:*)",
+      "Bash(find:*)",
+      "Bash(cmd //c \"cd C:\\Users\\tjt\\GitHub\\keykitwasm\\examples && build_examples.bat\")",
+      "Bash(cmd //c \"C:\\Users\\tjt\\GitHub\\keykitwasm\\examples\\build_examples.bat\")"
     ],
     "deny": [],
     "ask": []

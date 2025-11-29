@@ -2,6 +2,9 @@
 REM Build script for canvas drawing examples
 REM Make sure you have Emscripten installed and activated
 
+REM Change to the directory where this script is located
+cd /d "%~dp0"
+
 set EMCC=C:\Users\tjt\GitHub\emsdk\upstream\emscripten\emcc.bat
 
 echo Building Canvas Drawing Examples...
