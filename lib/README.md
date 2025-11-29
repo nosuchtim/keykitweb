@@ -49,7 +49,7 @@ In the WebAssembly build:
 2. Each file listed is downloaded and written to a virtual filesystem at `/keykit/lib/`
 3. C code can access files using standard I/O: `fopen("/keykit/lib/filename.k", "r")`
 
-See `../RUNTIME_LIBRARY_LOADING.md` for complete details.
+See `../docs/RUNTIME_LIBRARY_LOADING.md` for complete details.
 
 ## File Count
 

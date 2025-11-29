@@ -37,7 +37,7 @@ cd src
 bash build_keylib.sh
 ```
 
-This builds Windows-native utilities like `keylib.exe` that scan `.k` files and generate library definitions. See [WINDOWS_BUILD.md](src/WINDOWS_BUILD.md) for detailed Windows compilation instructions, including how the Windows-compatible `dirent.h` implementation is used.
+This builds Windows-native utilities like `keylib.exe` that scan `.k` files and generate library definitions. See [WINDOWS_BUILD.md](docs/WINDOWS_BUILD.md) for detailed Windows compilation instructions, including how the Windows-compatible `dirent.h` implementation is used.
 
 ## Architecture
 
@@ -86,7 +86,7 @@ The WebAssembly port uses a **stub-first approach**:
 
 ### Using EM_ASM for Canvas Drawing
 
-See `EM_ASM_GUIDE.md` and `CANVAS_DRAWING_GUIDE.md` for comprehensive guides. Quick example:
+See `docs/EM_ASM_GUIDE.md` and `docs/CANVAS_DRAWING_GUIDE.md` for comprehensive guides. Quick example:
 
 ```c
 #include <emscripten.h>
@@ -141,7 +141,7 @@ KeyKit library files (`lib/*.k` and related files) are loaded at runtime into Em
 - **Virtual Paths**: C code accesses files via `/keykit/lib/filename.k` using standard `fopen()`, `fread()`, etc.
 - **Build Config**: `FORCE_FILESYSTEM=1` and `FS` API exported in `build_wasm.py`
 
-See `RUNTIME_LIBRARY_LOADING.md` for complete details.
+See `docs/RUNTIME_LIBRARY_LOADING.md` for complete details.
 
 ## NATS Messaging Integration
 

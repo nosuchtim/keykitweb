@@ -11,7 +11,8 @@
       "Bash(python generate_manifest.py:*)",
       "Bash(find:*)",
       "Bash(cmd //c \"cd C:\\Users\\tjt\\GitHub\\keykitwasm\\examples && build_examples.bat\")",
-      "Bash(cmd //c \"C:\\Users\\tjt\\GitHub\\keykitwasm\\examples\\build_examples.bat\")"
+      "Bash(cmd //c \"C:\\Users\\tjt\\GitHub\\keykitwasm\\examples\\build_examples.bat\")",
+      "Bash(git mv:*)"
     ],
     "deny": [],
     "ask": []
