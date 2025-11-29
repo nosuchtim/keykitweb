@@ -1,10 +1,9 @@
 # KeyKit WebAssembly
 
 This is a WebAssembly port of **KeyKit**, enabling KeyKit to run directly in web browsers using Emscripten and modern web APIs.
+This repo is a stripped-down version of the https://github.com/nosuchtim/keykit repo, with only the WASM port and updates needed for that environment.
 
-## What is KeyKit?
-
-KeyKit is a programming language and graphical toolkit for MIDI manipulation and experimentation, originally created by Tim Thompson at AT&T Bell Labs.
+KeyKit is a programming language and graphical toolkit for realtime and algorithmic MIDI manipulation and experimentation.  It was created by Tim Thompson at AT&T Bell Labs and released in 1996.
 Key capabilities include:
 
 - **Algorithmic Composition** - Generate music programmatically
@@ -13,8 +12,6 @@ Key capabilities include:
 - **GUI** - A custom window system implemented completely in KeyKit code.
 - **Interactive Tools** - Visual editors, piano roll, drum grid, and more
 - **Extensibility** - Write custom tools and functions in the KeyKit language
-
-Originally released in 1996, KeyKit has been used by musicians and composers worldwide for experimental and generative music.
 
 ## Features of this WASM port
 
@@ -46,7 +43,7 @@ Start a local web server (required for loading library files):
 python serve.py
 ```
 
-Then open `http://localhost:8000/keykit.html` in your browser.
+Then open `http://localhost:8000/keykit.html` in your browser.  Use the "Change local folder" button to attach the local directory you want to use.
 
 ## Project Structure
 
@@ -74,8 +71,6 @@ The port uses two integration methods:
 1. **EM_ASM** - Inline JavaScript in C for simple operations
 2. **JavaScript Library** - `keykit_library.js` for complex features (Canvas, MIDI)
 
-This repo is a stripped-down version of the https://github.com/nosuchtim/keykit repo, with only the WASM port and updates needed for that environment.
-
 ## MIDI Setup
 
 KeyKit works with any Web MIDI compatible device. For virtual MIDI routing on Windows, use [loopMIDI](https://www.tobias-erichsen.de/software/loopmidi.html).  Some of the files (e.g. lib/keyrc.k) are hard-coded to open "loopMIDI Port 1" for output and "loopMIDI Port 2" for input.
@@ -96,3 +91,7 @@ python generate_manifest.py
 The `music` directory includes sample MIDI files for testing:
 
 - Bach Two-Part Inventions (`bachinv1.mid` - `bachinv8.mid`)
+
+## Issues
+
+- Sweeping operations are ugly due to the lack of real XOR graphics.
