@@ -12,7 +12,7 @@ Implemented runtime loading of KeyKit library files from the `lib/` directory in
 3. **`RUNTIME_LIBRARY_LOADING.md`** - Complete documentation of the system
 
 ### Modified:
-1. **`src/keykit_shell.html`** - Added `loadLibraryFiles()` function that:
+1. **`keykit_shell.html`** - Added `loadLibraryFiles()` function that:
    - Creates virtual directories `/keykit/` and `/keykit/lib/`
    - Fetches `lib_manifest.json`
    - Loads all library files in batches of 10

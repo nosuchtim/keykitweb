@@ -11,13 +11,12 @@ KeyKit is a music programming language and MIDI toolkit being ported to WebAssem
 ### Building the WebAssembly Version
 
 ```bash
-cd src
 python build_wasm.py
 ```
 
 This compiles the KeyKit C source to WebAssembly using Emscripten. The build script:
 - Uses Emscripten located at `C:\Users\tjt\GitHub\emsdk\upstream\emscripten\emcc.bat`
-- Outputs `keykit.html`, `keykit.js`, and `keykit.wasm`
+- Outputs `keykit.html`, `keykit.js`, and `keykit.wasm` to the main repo directory
 - Enables `ALLOW_MEMORY_GROWTH=1` and `ASYNCIFY=1` for blocking calls
 - Logs output to `build_log.txt`
 
@@ -33,7 +32,6 @@ This builds two canvas drawing examples demonstrating how to integrate HTML5 Can
 ### Building Windows Native Utilities
 
 ```bash
-cd src
 bash build_keylib.sh
 ```
 
@@ -137,7 +135,7 @@ Use the test programs to exercise graphics functionality:
 KeyKit library files (`lib/*.k` and related files) are loaded at runtime into Emscripten's virtual filesystem:
 
 - **Manifest**: `lib/lib_manifest.json` lists all library files (regenerate with `bash lib/generate_manifest.sh`)
-- **Runtime Loading**: `src/keykit_shell.html` contains `loadLibraryFiles()` that fetches and loads files before `main()`
+- **Runtime Loading**: `keykit_shell.html` contains `loadLibraryFiles()` that fetches and loads files before `main()`
 - **Virtual Paths**: C code accesses files via `/keykit/lib/filename.k` using standard `fopen()`, `fread()`, etc.
 - **Build Config**: `FORCE_FILESYSTEM=1` and `FS` API exported in `build_wasm.py`
 
@@ -151,7 +149,7 @@ KeyKit includes **NATS.ws** integration for distributed messaging and collaborat
 
 The NATS implementation follows the same async callback pattern as MIDI:
 
-1. **JavaScript Layer** ([src/keykit_library.js](src/keykit_library.js)):
+1. **JavaScript Layer** ([keykit_library.js](keykit_library.js)):
    - `js_nats_connect(url)` - Connect to NATS server via WebSocket
    - `js_nats_publish(subject, data)` - Publish string message to subject
    - `js_nats_subscribe(subject)` - Subscribe to additional subjects
@@ -172,8 +170,8 @@ The NATS implementation follows the same async callback pattern as MIDI:
    - 10-message circular buffer for incoming messages
 
 3. **Build Configuration**:
-   - NATS.ws library loaded via CDN in [src/keykit_shell.html](src/keykit_shell.html)
-   - `mdep_on_nats_message` exported in [src/build_wasm.py](src/build_wasm.py)
+   - NATS.ws library loaded via CDN in [keykit_shell.html](keykit_shell.html)
+   - `mdep_on_nats_message` exported in [build_wasm.py](build_wasm.py)
 
 ### Usage Example
 
@@ -244,13 +242,12 @@ Implementation complete:
 
 1. Build the project:
    ```bash
-   cd src
    python build_wasm.py
    ```
 
 2. Serve the files (CORS requires a web server):
    ```bash
-   # From the src directory
+   # From the repo root directory
    python -m http.server 8000
    # OR
    npx http-server

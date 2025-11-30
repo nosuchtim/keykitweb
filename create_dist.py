@@ -47,13 +47,12 @@ def run_build_steps(repo_path):
         print(f"Warning: lib manifest script not found: {lib_manifest_script}")
 
     # Run WASM build
-    src_dir = os.path.join(repo_path, "src")
-    build_script = os.path.join(src_dir, "build_wasm.py")
+    build_script = os.path.join(repo_path, "build_wasm.py")
     if os.path.exists(build_script):
         print("\n[2/2] Building WASM...")
         result = subprocess.run(
             [sys.executable, "build_wasm.py"],
-            cwd=src_dir,
+            cwd=repo_path,
             capture_output=True,
             text=True
         )
@@ -85,9 +84,9 @@ def create_dist(repo_path, zip_path):
 
     # Verify required files exist after build
     required_checks = [
-        os.path.join(repo_path, "src", "keykit.html"),
-        os.path.join(repo_path, "src", "keykit.js"),
-        os.path.join(repo_path, "src", "keykit.wasm"),
+        os.path.join(repo_path, "keykit.html"),
+        os.path.join(repo_path, "keykit.js"),
+        os.path.join(repo_path, "keykit.wasm"),
         os.path.join(repo_path, "lib", "lib_manifest.json"),
     ]
 
@@ -115,17 +114,16 @@ def create_dist(repo_path, zip_path):
     print(f"Files will be in subdirectory: {subdir}/")
 
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-        # Files from src/ directory (the built WASM application)
-        src_files = [
+        # Files from main repo directory (the built WASM application)
+        app_files = [
             "keykit.html",
             "keykit.js",
             "keykit.wasm",
             "keykit.ico",
         ]
 
-        src_dir = os.path.join(repo_path, "src")
-        for filename in src_files:
-            src_file = os.path.join(src_dir, filename)
+        for filename in app_files:
+            src_file = os.path.join(repo_path, filename)
             if os.path.exists(src_file):
                 zf.write(src_file, f"{subdir}/{filename}")
                 print(f"Added: {subdir}/{filename}")
@@ -228,10 +226,10 @@ def main():
     zip_path = os.path.abspath(sys.argv[1])
 
     # Verify we're in the right directory
-    if not os.path.exists(os.path.join(repo_path, "src", "build_wasm.py")):
+    if not os.path.exists(os.path.join(repo_path, "build_wasm.py")):
         print("Error: This script must be run from the keykitwasm repository directory.")
         print(f"Current directory: {repo_path}")
-        print("Expected to find: src/build_wasm.py")
+        print("Expected to find: build_wasm.py")
         sys.exit(1)
 
     create_dist(repo_path, zip_path)

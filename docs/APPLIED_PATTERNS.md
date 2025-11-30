@@ -8,14 +8,14 @@ The implementation transforms KeyKit from stub-based graphics/MIDI to fully func
 
 ### Files Created
 
-1. **`src/keykit_library.js`** - JavaScript library with Canvas, MIDI, and input functions
-2. **`src/keykit_shell.html`** - Custom HTML template with canvas and styling
+1. **`keykit_library.js`** - JavaScript library with Canvas, MIDI, and input functions
+2. **`keykit_shell.html`** - Custom HTML template with canvas and styling
 3. **`APPLIED_PATTERNS.md`** - This documentation
 
 ### Files Modified
 
 1. **`src/mdep_wasm.c`** - Implemented all graphics, MIDI, mouse, and keyboard functions
-2. **`src/build_wasm.py`** - Updated build to include JavaScript library and exports
+2. **`build_wasm.py`** - Updated build to include JavaScript library and exports
 
 ## Pattern 1: JavaScript Library Integration
 
@@ -38,7 +38,7 @@ mergeInto(LibraryManager.library, {
 ```
 
 ### Applied to KeyKit
-Created `src/keykit_library.js` with all necessary functions:
+Created `keykit_library.js` with all necessary functions:
 
 ```javascript
 mergeInto(LibraryManager.library, {
@@ -54,7 +54,7 @@ mergeInto(LibraryManager.library, {
 
 **Build Integration:**
 ```python
-# src/build_wasm.py
+# build_wasm.py
 "--js-library", "keykit_library.js"
 ```
 
@@ -145,7 +145,7 @@ js_request_midi_access: function () {
 
 ### Applied to KeyKit
 ```javascript
-// src/keykit_library.js
+// keykit_library.js
 js_request_midi_access: function () {
     if (navigator.requestMIDIAccess) {
         navigator.requestMIDIAccess({ sysex: false })
@@ -261,7 +261,7 @@ canvas.addEventListener('mousedown', function(e) {
 
 ### Applied to KeyKit
 ```javascript
-// src/keykit_library.js
+// keykit_library.js
 js_setup_mouse_events: function () {
     window.keykitMouseX = 0;
     window.keykitMouseY = 0;
@@ -297,7 +297,7 @@ int mdep_mouse(int *ax, int *ay, int *am) {
 
 ### Applied to KeyKit
 ```javascript
-// src/keykit_library.js
+// keykit_library.js
 js_setup_keyboard_events: function () {
     window.keykitKeyBuffer = [];
 
@@ -335,7 +335,7 @@ EXPORTED_FUNCTIONS="['_main','_update_animation','_on_mouse_event','_on_midi_rea
 
 ### Applied to KeyKit
 ```python
-# src/build_wasm.py
+# build_wasm.py
 EXPORTED_FUNCTIONS=['_main','_mdep_on_midi_ready','_mdep_on_midi_message',
                     '_mdep_on_mouse_move','_mdep_on_mouse_button','_mdep_on_key_event']
 ```
@@ -366,7 +366,7 @@ EXPORTED_RUNTIME_METHODS=['ccall','cwrap','getValue','setValue','UTF8ToString']
 ```
 
 ### Applied to KeyKit
-Created `src/keykit_shell.html` with:
+Created `keykit_shell.html` with:
 - Canvas element: `<canvas id="keykit-canvas" width="1024" height="768">`
 - Console output div for printf/logging
 - Loading progress bar

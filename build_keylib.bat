@@ -9,7 +9,7 @@ REM Check if gcc (MinGW) is available
 where gcc >nul 2>&1
 if %ERRORLEVEL% EQU 0 (
     echo Found gcc, using MinGW compiler...
-    gcc -o keylib.exe keylib.c -I. -Wall
+    gcc -o keylib.exe src/keylib.c -Isrc -Wall
     if %ERRORLEVEL% EQU 0 (
         echo ✓ Successfully built keylib.exe with gcc
         goto :done
@@ -24,7 +24,7 @@ REM Try MSVC cl.exe
 where cl >nul 2>&1
 if %ERRORLEVEL% EQU 0 (
     echo Found cl, using MSVC compiler...
-    cl /Fe:keylib.exe keylib.c /I. /W3
+    cl /Fe:keylib.exe src/keylib.c /Isrc /W3
     if %ERRORLEVEL% EQU 0 (
         echo ✓ Successfully built keylib.exe with MSVC
         goto :done

@@ -42,10 +42,13 @@ Use the "Change Local Folder" button to attach the local directory you want to u
 
 ```
 keykitwasm/
+├── keykit.html             # Main application page (built)
+├── keykit.js               # JavaScript runtime (built)
+├── keykit.wasm             # WebAssembly binary (built)
+├── keykit_shell.html       # Custom HTML template (source)
+├── keykit_library.js       # JavaScript interop (Canvas, MIDI, input)
 ├── src/                    # C source code and build system
 │   ├── mdep_wasm.c/h       # WebAssembly machine-dependent layer
-│   ├── keykit_library.js   # JavaScript interop (Canvas, MIDI, input)
-│   ├── keykit_shell.html   # Custom HTML template
 │   ├── build_wasm.py       # Emscripten build script
 │   └── *.c, *.h            # KeyKit core source files
 ├── lib/                    # KeyKit library files (*.k)

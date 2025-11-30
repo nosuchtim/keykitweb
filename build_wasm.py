@@ -3,12 +3,12 @@ import subprocess
 import glob
 import sys
 
-# List of source files to compile
+# List of source files to compile (in src/ directory)
 src_files = [
-    "main.c", "util.c", "misc.c", "phrase.c", "sym.c", "keyto.c", "yacc.c",
-    "code.c", "code2.c", "grid.c", "view.c", "menu.c", "task.c", "fifo.c",
-    "mfin.c", "real.c", "kwind.c", "fsm.c", "bltin.c", "meth.c", "regex.c",
-    "mdep_wasm.c"
+    "src/main.c", "src/util.c", "src/misc.c", "src/phrase.c", "src/sym.c", "src/keyto.c", "src/yacc.c",
+    "src/code.c", "src/code2.c", "src/grid.c", "src/view.c", "src/menu.c", "src/task.c", "src/fifo.c",
+    "src/mfin.c", "src/real.c", "src/kwind.c", "src/fsm.c", "src/bltin.c", "src/meth.c", "src/regex.c",
+    "src/mdep_wasm.c"
 ]
 
 def find_emcc():
@@ -24,13 +24,13 @@ def compile_wasm():
     if emcc is None:
         sys.exit(1)
     
-    # Output file
+    # Output file (in current directory)
     output = "keykit.html"
-    
+
     # Compiler flags
     flags = [
         emcc,  # Use the found emcc path
-        "-I.",
+        "-Isrc",
         "-o", output,
         "--js-library", "keykit_library.js",  # Include JavaScript library
         "--shell-file", "keykit_shell.html",  # Custom HTML shell
@@ -54,10 +54,10 @@ def compile_wasm():
 
     # Optional: Preload files if lib directory exists
     # Uncomment these lines if you have a lib directory to package
-    # if os.path.exists("../lib"):
-    #     flags.extend(["--preload-file", "../lib@/keykit/lib"])
-    # if os.path.exists("../music"):
-    #     flags.extend(["--preload-file", "../music@/keykit/music"])
+    # if os.path.exists("lib"):
+    #     flags.extend(["--preload-file", "lib@/keykit/lib"])
+    # if os.path.exists("music"):
+    #     flags.extend(["--preload-file", "music@/keykit/music"])
     
     cmd = flags + src_files
     

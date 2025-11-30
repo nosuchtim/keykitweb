@@ -8,7 +8,7 @@ echo ""
 # Try gcc first (MinGW or similar)
 if command -v gcc &> /dev/null; then
     echo "Found gcc, compiling keylib.c..."
-    gcc -o keylib.exe keylib.c -I. -Wall
+    gcc -o keylib.exe src/keylib.c -Isrc -Wall
     if [ $? -eq 0 ]; then
         echo "✓ Successfully built keylib.exe with gcc"
         echo ""

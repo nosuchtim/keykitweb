@@ -44,8 +44,10 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            width: 100%;
-            max-width: 1400px;
+            width: 90%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding-bottom: 40px;
         }
 
         #canvas-container {
@@ -62,6 +64,7 @@
             display: block;
             width: 100%;
             height: auto;
+            max-height: 80vh;
             border-radius: 5px;
             /* Use auto for smooth text rendering instead of pixelated */
             image-rendering: auto;
@@ -900,6 +903,6 @@
         });
     </script>
 
-    <script async type="text/javascript" src="keykit.js"></script>
+    {{{ SCRIPT }}}
 </body>
 </html>

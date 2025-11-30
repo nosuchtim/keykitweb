@@ -29,7 +29,7 @@ bash generate_manifest.sh
 
 ### 2. Runtime Loading in HTML Shell
 
-The `src/keykit_shell.html` file contains a `loadLibraryFiles()` function that:
+The `keykit_shell.html` file contains a `loadLibraryFiles()` function that:
 
 1. Creates virtual directories `/keykit/` and `/keykit/lib/`
 2. Fetches `lib_manifest.json` to get the list of files

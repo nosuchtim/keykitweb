@@ -81,7 +81,7 @@ Created a robust Python build script with:
 
 - ✅ `src/mdep_wasm.h` - Complete header (111 lines)
 - ✅ `src/mdep_wasm.c` - Complete implementation (~520 lines)
-- ✅ `src/build_wasm.py` - Build script (60 lines)
+- ✅ `build_wasm.py` - Build script (60 lines)
 - ✅ `src/key.h` - Updated for WebAssembly support
 - ✅ `WASM_CONVERSION_PROGRESS.md` - Detailed progress documentation
 
@@ -90,7 +90,6 @@ Created a robust Python build script with:
 ### Immediate (To Get It Compiling)
 1. **Test the build**:
    ```bash
-   cd src
    python build_wasm.py
    ```
    This should compile without errors (though warnings are expected)
