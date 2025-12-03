@@ -69,19 +69,24 @@ function dokeylocal() {
  	# Open the first available input/output port from a preferred list
 
  	preferred_outputs = [
- 		"IAC Driver Bus 1"=0,
- 		"Springbeats vMIDI1"=0,
- 		"Microsoft GS Wavetable Synth"=0
+		0="loopMIDI Port 1",    # loopMIDI
+		1="01. Internal MIDI",  # LoopBe
+ 		2="IAC Driver Bus 1",   # macOS
+ 		3="Springbeats vMIDI1", # SBVMIDI
+ 		4="Microsoft GS Wavetable Synth" # windows
  	]
 
  	preferred_inputs = [
- 		"IAC Driver Bus 1"=0,
- 		"Springbeats vMIDI2"=0
+		0="loopMIDI Port 2",    # loopMIDI
+		1="02. Internal MIDI",  # LoopBe
+ 		2="IAC Driver Bus 2",   # macOS
+ 		3="Springbeats vMIDI2"  # SBVMIDI
  	]
 
 	outlist = midi("output","list")
 	outp = -1
-	for ( pref_name in preferred_outputs ) {
+	for ( n=0; n<sizeof(preferred_outputs); n++ ) {
+		pref_name = preferred_outputs[n]
 		for ( portnum in outlist ) {
 			if ( outlist[portnum] == pref_name ) {
 				print("Found default output: "+pref_name)
@@ -96,7 +101,8 @@ function dokeylocal() {
 
 	inlist = midi("input","list")
 	inp = -1
-	for ( pref_name in preferred_inputs ) {
+	for ( n=0; n<sizeof(preferred_inputs); n++ ) {
+		pref_name = preferred_inputs[n]
 		for ( portnum in inlist ) {
 			if ( inlist[portnum] == pref_name ) {
 				print("Found default input: "+pref_name)
