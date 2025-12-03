@@ -66,15 +66,51 @@ function addpostrc(f) {
 #desc	and if that doesn't exist, use some defaults
 function dokeylocal() {
 
-	forceout = "Springbeats vMIDI1"
-	outp = outport(forceout)
-	
-	forcein = "Springbeats vMIDI2"
-	inp = inport(forcein)
+ 	# Open the first available input/output port from a preferred list
+
+ 	preferred_outputs = [
+ 		"IAC Driver Bus 1"=0,
+ 		"Springbeats vMIDI1"=0,
+ 		"Microsoft GS Wavetable Synth"=0
+ 	]
+
+ 	preferred_inputs = [
+ 		"IAC Driver Bus 1"=0,
+ 		"Springbeats vMIDI2"=0
+ 	]
+
+	outlist = midi("output","list")
+	outp = -1
+	for ( pref_name in preferred_outputs ) {
+		for ( portnum in outlist ) {
+			if ( outlist[portnum] == pref_name ) {
+				print("Found default output: "+pref_name)
+				outp = outport(pref_name)
+				mapport(0,outp)
+				break
+			}
+		}
+		if ( outp >= 0 )
+			break
+	}
+
+	inlist = midi("input","list")
+	inp = -1
+	for ( pref_name in preferred_inputs ) {
+		for ( portnum in inlist ) {
+			if ( inlist[portnum] == pref_name ) {
+				print("Found default input: "+pref_name)
+				inp = inport(pref_name)
+				break
+			}
+		}
+		if ( inp >= 0 )
+			break
+	}
 
 	# print("dokeylocal() is opening MIDI input = "+forcein+" port = "+string(inp))
 
-	# KEYOUT environment variable is default output port
+	# If set, the KEYOUT environment variable is default output port
 	outportname = mdep("env","get","KEYOUT")
 	if ( defined(outportname) && (outportname != "") ) {
 		out = outport(outportname)

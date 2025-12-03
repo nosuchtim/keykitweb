@@ -223,7 +223,12 @@ def main():
 
     # Use current directory as repo path
     repo_path = os.getcwd()
-    zip_path = os.path.abspath(sys.argv[1])
+
+    # Put output in dist/ directory
+    dist_dir = os.path.join(repo_path, "dist")
+    os.makedirs(dist_dir, exist_ok=True)
+
+    zip_path = os.path.join(dist_dir, sys.argv[1])
 
     # Verify we're in the right directory
     if not os.path.exists(os.path.join(repo_path, "build_wasm.py")):

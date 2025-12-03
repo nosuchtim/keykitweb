@@ -2363,9 +2363,10 @@ bi_midi(int argc)
 			}
 			/*
 			 * Usage is midi("portmap",inportnum,chan#,outportnum)
+			 * inportnum of 0 means the "default" port map
 			 */
 			inportno = neednum("midi",ARG(1));
-			if ( ! validinputport(inportno) ) {
+			if ( inportno != 0 && ! validinputport(inportno) ) {
 				eprint("midi: invalid input port number %d !?\n",inportno);
 				goto getout;
 			}

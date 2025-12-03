@@ -12,7 +12,8 @@
       "Bash(find:*)",
       "Bash(cmd //c \"cd C:\\Users\\tjt\\GitHub\\keykitwasm\\examples && build_examples.bat\")",
       "Bash(cmd //c \"C:\\Users\\tjt\\GitHub\\keykitwasm\\examples\\build_examples.bat\")",
-      "Bash(git mv:*)"
+      "Bash(git mv:*)",
+      "Bash(python create_dist.py:*)"
     ],
     "deny": [],
     "ask": []

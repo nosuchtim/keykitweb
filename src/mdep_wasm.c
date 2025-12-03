@@ -64,6 +64,9 @@ extern void js_browse_file(const char *desc, const char *types, int mustexist);
 extern int js_browse_is_done(void);
 extern char *js_browse_get_result(void);
 
+// Host OS detection
+extern int js_get_host_os(char *buffer, int buffer_size);
+
 // Global state for graphics
 static int current_color_index = 0;
 static int canvas_width = 1024;
@@ -1581,10 +1584,26 @@ mdep_musicpath(void)
     return "/keykit/music";
 }
 
+// Get host operating system name
+// Returns: "windows", "macos", "linux", "ios", "android", or "unknown"
+static char host_os_buffer[32] = "";
+
+char *
+mdep_hostos(void)
+{
+    if (host_os_buffer[0] == '\0') {
+        js_get_host_os(host_os_buffer, sizeof(host_os_buffer));
+    }
+    return host_os_buffer;
+}
+
 void
 mdep_postrc(void)
 {
-    // Post-initialization
+    // Install Host global variable with the host OS name
+    // This allows KeyKit code to detect: "windows", "macos", "linux", "ios", "android"
+    extern void installstr(char *name, char *str);
+    installstr("Host", mdep_hostos());
 }
 
 int

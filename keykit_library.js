@@ -1137,5 +1137,34 @@ mergeInto(LibraryManager.library, {
             console.error('[WebSocket] Error closing port ' + portId + ':', e);
             return -1;
         }
+    },
+
+    // ========== Host OS Detection ==========
+
+    // Get host operating system name
+    // Returns: "windows", "macos", "linux", "ios", "android", or "unknown"
+    js_get_host_os__deps: ['$stringToUTF8'],
+    js_get_host_os: function (bufferPtr, bufferSize) {
+        var os = 'unknown';
+        var userAgent = navigator.userAgent || '';
+        var platform = navigator.platform || '';
+
+        // Check for mobile first
+        if (/Android/i.test(userAgent)) {
+            os = 'android';
+        } else if (/iPad|iPhone|iPod/.test(userAgent) || (platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+            os = 'ios';
+        } else if (/Win/.test(platform) || /Windows/.test(userAgent)) {
+            os = 'windows';
+        } else if (/Mac/.test(platform)) {
+            os = 'macos';
+        } else if (/Linux/.test(platform) || /Linux/.test(userAgent)) {
+            os = 'linux';
+        }
+
+        // Copy to C buffer
+        var len = Math.min(os.length, bufferSize - 1);
+        stringToUTF8(os, bufferPtr, len + 1);
+        return len;
     }
 });
